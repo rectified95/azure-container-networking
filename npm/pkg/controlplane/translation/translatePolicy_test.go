@@ -1791,7 +1791,6 @@ func TestEgressPolicy(t *testing.T) {
 					policies.NewSetInfo("default", ipsets.Namespace, included, targetPodMatchType),
 				},
 				ACLs: []*policies.ACLPolicy{
-
 					defaultDropACL("default", "serve-tcp", policies.Egress),
 				},
 			},
