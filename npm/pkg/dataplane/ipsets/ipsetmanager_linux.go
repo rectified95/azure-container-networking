@@ -2,7 +2,6 @@ package ipsets
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/parse"
 	"github.com/Azure/azure-container-networking/npm/util"
@@ -180,6 +179,8 @@ func (iMgr *IPSetManager) fileCreatorForReset(ipsetListOutput []byte) (*ioutil.F
 }
 
 /*
+FIXME update documentation
+
 overall error handling for ipset restore file.
 ipset restore will apply all lines to the kernel before a failure, so when recovering from a line failure, we must skip the lines that were already applied.
 below, "set" refers to either hashset or list, except in the sections for adding to (hash)set and adding to list
@@ -248,13 +249,14 @@ example where every set in add/update cache should have ip 1.2.3.4 and 2.3.4.5:
 */
 func (iMgr *IPSetManager) applyIPSets() error {
 	var saveFile []byte
-	var saveError error
-	if len(iMgr.toAddOrUpdateCache) > 0 {
-		saveFile, saveError = iMgr.ipsetSave()
-		if saveError != nil {
-			return npmerrors.SimpleErrorWrapper("ipset save failed when applying ipsets", saveError)
-		}
-	}
+	// FIXME delete
+	// var saveError error
+	// if iMgr.dirtyCache.numSetsToAddOrUpdate() > 0 {
+	// 	saveFile, saveError = iMgr.ipsetSave()
+	// 	if saveError != nil {
+	// 		return npmerrors.SimpleErrorWrapper("ipset save failed when applying ipsets", saveError)
+	// 	}
+	// }
 	creator := iMgr.fileCreatorForApply(maxTryCount, saveFile)
 	restoreError := creator.RunCommandWithFile(ipsetCommand, ipsetRestoreFlag)
 	if restoreError != nil {
@@ -276,37 +278,52 @@ func (iMgr *IPSetManager) ipsetSave() ([]byte, error) {
 	return saveFile, nil
 }
 
+// FIXME remove saveFile param
 func (iMgr *IPSetManager) fileCreatorForApply(maxTryCount int, saveFile []byte) *ioutil.FileCreator {
 	creator := ioutil.NewFileCreator(iMgr.ioShim, maxTryCount, ipsetRestoreLineFailurePattern) // TODO make the line failure pattern into a definition constant eventually
 
 	// 1. create all sets first so we don't try to add a member set to a list if it hasn't been created yet
-	for prefixedName := range iMgr.toAddOrUpdateCache {
+	setsToAddOrUpdate := iMgr.dirtyCache.getSetsToAddOrUpdate()
+	for _, prefixedName := range setsToAddOrUpdate {
 		set := iMgr.setMap[prefixedName]
 		iMgr.createSetForApply(creator, set)
 		// NOTE: currently no logic to handle this scenario:
 		// if a set in the toAddOrUpdateCache is in the kernel with the wrong type, then we'll try to create it, which will fail in the first restore call, but then be skipped in a retry
 	}
 
-	// 2. for dirty sets already in the kernel, update members (add members not in the kernel, and delete undesired members in the kernel)
-	iMgr.updateDirtyKernelSets(saveFile, creator)
-
-	// 3. for the remaining dirty sets, add their members to the kernel
-	for prefixedName := range iMgr.toAddOrUpdateCache {
-		set := iMgr.setMap[prefixedName]
+	// 2. add/delete members from dirty sets to add or update
+	for _, prefixedName := range setsToAddOrUpdate {
 		sectionID := sectionID(addOrUpdateSectionPrefix, prefixedName)
+		originalMembers := iMgr.dirtyCache.getOriginalMembers(prefixedName)
+		set := iMgr.setMap[prefixedName]
 		if set.Kind == HashSet {
 			for ip := range set.IPPodKey {
-				iMgr.addMemberForApply(creator, set, sectionID, ip)
+				if _, ok := originalMembers[ip]; ok {
+					// remove from members so we don't try to delete it later
+					delete(originalMembers, ip)
+				} else {
+					// add the member since it didn't exist before
+					iMgr.addMemberForApply(creator, set, sectionID, ip)
+				}
 			}
 		} else {
-			for _, member := range set.MemberIPSets {
-				iMgr.addMemberForApply(creator, set, sectionID, member.HashedName)
+			for setName := range set.MemberIPSets {
+				if _, ok := originalMembers[setName]; ok {
+					// remove from members so we don't try to delete it later
+					delete(originalMembers, setName)
+				} else {
+					// add the member since it didn't exist before
+					iMgr.addMemberForApply(creator, set, sectionID, setName)
+				}
 			}
+		}
+		for member := range originalMembers {
+			iMgr.deleteMemberForApply(creator, set, sectionID, member)
 		}
 	}
 
 	/*
-		4. flush and destroy sets in the original delete cache
+		3. flush and destroy sets in the original delete cache
 
 		We must perform this step after member deletions because of the following scenario:
 		Suppose we want to destroy set A, which is referenced by list L. For set A to be in the toDeleteCache,
@@ -314,174 +331,14 @@ func (iMgr *IPSetManager) fileCreatorForApply(maxTryCount int, saveFile []byte) 
 		but until then, set A is in use by a kernel component and can't be destroyed.
 	*/
 	// flush all sets first in case a set we're destroying is referenced by a list we're destroying
-	for prefixedName := range iMgr.toDeleteCache {
+	setsToDelete := iMgr.dirtyCache.getSetsToDelete()
+	for _, prefixedName := range setsToDelete {
 		iMgr.flushSetForApply(creator, prefixedName)
 	}
-	for prefixedName := range iMgr.toDeleteCache {
+	for _, prefixedName := range setsToDelete {
 		iMgr.destroySetForApply(creator, prefixedName)
 	}
 	return creator
-}
-
-// updates the creator (adds/deletes members) for dirty sets already in the kernel
-// updates the toAddOrUpdateCache: after calling this function, the cache will only consist of sets to create
-// error handling principal:
-// - if contract with ipset save (or grep) is breaking, salvage what we can, take a snapshot (TODO), and log the failure
-// - have a background process for sending/removing snapshots intermittently
-func (iMgr *IPSetManager) updateDirtyKernelSets(saveFile []byte, creator *ioutil.FileCreator) {
-	// map hashed names to prefixed names
-	toAddOrUpdateHashedNames := make(map[string]string)
-	for prefixedName := range iMgr.toAddOrUpdateCache {
-		hashedName := iMgr.setMap[prefixedName].HashedName
-		toAddOrUpdateHashedNames[hashedName] = prefixedName
-	}
-
-	// in each iteration, read a create line and any ensuing add lines
-	readIndex := 0
-	var line []byte
-	if readIndex < len(saveFile) {
-		line, readIndex = parse.Line(readIndex, saveFile)
-		if !hasPrefix(line, createStringWithSpace) {
-			klog.Errorf("expected a create line in ipset save file, but got the following line: %s", string(line))
-			// TODO send error snapshot
-			line, readIndex = nextCreateLine(readIndex, saveFile)
-		}
-	}
-	for readIndex < len(saveFile) {
-		// 1. get the hashed name
-		lineAfterCreate := string(line[len(createStringWithSpace):])
-		spaceSplitLineAfterCreate := strings.Split(lineAfterCreate, space)
-		hashedName := spaceSplitLineAfterCreate[0]
-
-		// 2. continue to the next create line if the set isn't in the toAddOrUpdateCache
-		prefixedName, shouldModify := toAddOrUpdateHashedNames[hashedName]
-		if !shouldModify {
-			line, readIndex = nextCreateLine(readIndex, saveFile)
-			continue
-		}
-
-		// 3. update the set from the kernel
-		set := iMgr.setMap[prefixedName]
-		// remove from the dirty cache so we don't add it later
-		delete(iMgr.toAddOrUpdateCache, prefixedName)
-		// mark the set as in the kernel
-		delete(toAddOrUpdateHashedNames, hashedName)
-
-		// 3.1 check for consistent type
-		restOfLine := spaceSplitLineAfterCreate[1:]
-		if haveTypeProblem(set, restOfLine) {
-			// error logging happens in the helper function
-			// TODO send error snapshot
-			line, readIndex = nextCreateLine(readIndex, saveFile)
-			continue
-		}
-
-		// 3.2 get desired members from cache
-		var membersToAdd map[string]struct{}
-		if set.Kind == HashSet {
-			membersToAdd = make(map[string]struct{}, len(set.IPPodKey))
-			for ip := range set.IPPodKey {
-				membersToAdd[ip] = struct{}{}
-			}
-		} else {
-			membersToAdd = make(map[string]struct{}, len(set.IPPodKey))
-			for _, member := range set.MemberIPSets {
-				membersToAdd[member.HashedName] = struct{}{}
-			}
-		}
-
-		// 3.4 determine which members to add/delete
-		membersToDelete := make(map[string]struct{})
-		for readIndex < len(saveFile) {
-			line, readIndex = parse.Line(readIndex, saveFile)
-			if hasPrefix(line, createStringWithSpace) {
-				break
-			}
-			if !hasPrefix(line, addStringWithSpace) {
-				klog.Errorf("expected an add line, but got the following line: %s", string(line))
-				// TODO send error snapshot
-				line, readIndex = nextCreateLine(readIndex, saveFile)
-				break
-			}
-			lineAfterAdd := string(line[len(addStringWithSpace):])
-			spaceSplitLineAfterAdd := strings.Split(lineAfterAdd, space)
-			parent := spaceSplitLineAfterAdd[0]
-			if len(spaceSplitLineAfterAdd) != 2 || parent != hashedName {
-				klog.Errorf("expected an add line for set %s in ipset save file, but got the following line: %s", hashedName, string(line))
-				// TODO send error snapshot
-				line, readIndex = nextCreateLine(readIndex, saveFile)
-				break
-			}
-			member := spaceSplitLineAfterAdd[1]
-
-			_, shouldKeep := membersToAdd[member]
-			if shouldKeep {
-				// member already in the kernel, so don't add it later
-				delete(membersToAdd, member)
-			} else {
-				// member should be deleted from the kernel
-				membersToDelete[member] = struct{}{}
-			}
-		}
-
-		// 3.5 delete undesired members from restore file
-		sectionID := sectionID(addOrUpdateSectionPrefix, prefixedName)
-		for member := range membersToDelete {
-			iMgr.deleteMemberForApply(creator, set, sectionID, member)
-		}
-		// 3.5 add new members to restore file
-		for member := range membersToAdd {
-			iMgr.addMemberForApply(creator, set, sectionID, member)
-		}
-	}
-}
-
-func nextCreateLine(originalReadIndex int, saveFile []byte) (createLine []byte, nextReadIndex int) {
-	nextReadIndex = originalReadIndex
-	for nextReadIndex < len(saveFile) {
-		createLine, nextReadIndex = parse.Line(nextReadIndex, saveFile)
-		if hasPrefix(createLine, createStringWithSpace) {
-			return
-		}
-	}
-	return
-}
-
-func haveTypeProblem(set *IPSet, restOfSpaceSplitCreateLine []string) bool {
-	// TODO check type based on maxelem for hash sets? CIDR blocks have a different maxelem
-	if len(restOfSpaceSplitCreateLine) == 0 {
-		klog.Error("expected a type specification for the create line but received nothing after the set name")
-		return true
-	}
-	typeString := restOfSpaceSplitCreateLine[0]
-	switch typeString {
-	case ipsetSetListString:
-		if set.Kind != ListSet {
-			lineString := fmt.Sprintf("create %s %s", set.HashedName, strings.Join(restOfSpaceSplitCreateLine, " "))
-			klog.Errorf("expected to find a ListSet but have the line: %s", lineString)
-			return true
-		}
-	case ipsetNetHashString:
-		if set.Kind != HashSet || set.Type == NamedPorts {
-			lineString := fmt.Sprintf("create %s %s", set.HashedName, strings.Join(restOfSpaceSplitCreateLine, " "))
-			klog.Errorf("expected to find a non-NamedPorts HashSet but have the following line: %s", lineString)
-			return true
-		}
-	case ipsetIPPortHashString:
-		if set.Type != NamedPorts {
-			lineString := fmt.Sprintf("create %s %s", set.HashedName, strings.Join(restOfSpaceSplitCreateLine, " "))
-			klog.Errorf("expected to find a NamedPorts set but have the following line: %s", lineString)
-			return true
-		}
-	default:
-		klog.Errorf("unknown type string [%s] in line: %s", typeString, strings.Join(restOfSpaceSplitCreateLine, " "))
-		return true
-	}
-	return false
-}
-
-func hasPrefix(line []byte, prefix string) bool {
-	return len(line) >= len(prefix) && string(line[:len(prefix)]) == prefix
 }
 
 func (iMgr *IPSetManager) flushSetForApply(creator *ioutil.FileCreator, prefixedName string) {
@@ -617,3 +474,164 @@ func (iMgr *IPSetManager) addMemberForApply(creator *ioutil.FileCreator, set *IP
 func sectionID(prefix, prefixedName string) string {
 	return fmt.Sprintf("%s-%s", prefix, prefixedName)
 }
+
+// updates the creator (adds/deletes members) for dirty sets already in the kernel
+// updates the toAddOrUpdateCache: after calling this function, the cache will only consist of sets to create
+// error handling principal:
+// - if contract with ipset save (or grep) is breaking, salvage what we can, take a snapshot (TODO), and log the failure
+// - have a background process for sending/removing snapshots intermittently
+// func (iMgr *IPSetManager) updateDirtyKernelSets(saveFile []byte, creator *ioutil.FileCreator) {
+// 	// map hashed names to prefixed names
+// 	toAddOrUpdateHashedNames := make(map[string]string)
+// 	for prefixedName := range iMgr.toAddOrUpdateCache {
+// 		hashedName := iMgr.setMap[prefixedName].HashedName
+// 		toAddOrUpdateHashedNames[hashedName] = prefixedName
+// 	}
+
+// 	// in each iteration, read a create line and any ensuing add lines
+// 	readIndex := 0
+// 	var line []byte
+// 	if readIndex < len(saveFile) {
+// 		line, readIndex = parse.Line(readIndex, saveFile)
+// 		if !hasPrefix(line, createStringWithSpace) {
+// 			klog.Errorf("expected a create line in ipset save file, but got the following line: %s", string(line))
+// 			// TODO send error snapshot
+// 			line, readIndex = nextCreateLine(readIndex, saveFile)
+// 		}
+// 	}
+// 	for readIndex < len(saveFile) {
+// 		// 1. get the hashed name
+// 		lineAfterCreate := string(line[len(createStringWithSpace):])
+// 		spaceSplitLineAfterCreate := strings.Split(lineAfterCreate, space)
+// 		hashedName := spaceSplitLineAfterCreate[0]
+
+// 		// 2. continue to the next create line if the set isn't in the toAddOrUpdateCache
+// 		prefixedName, shouldModify := toAddOrUpdateHashedNames[hashedName]
+// 		if !shouldModify {
+// 			line, readIndex = nextCreateLine(readIndex, saveFile)
+// 			continue
+// 		}
+
+// 		// 3. update the set from the kernel
+// 		set := iMgr.setMap[prefixedName]
+// 		// remove from the dirty cache so we don't add it later
+// 		delete(iMgr.toAddOrUpdateCache, prefixedName)
+// 		// mark the set as in the kernel
+// 		delete(toAddOrUpdateHashedNames, hashedName)
+
+// 		// 3.1 check for consistent type
+// 		restOfLine := spaceSplitLineAfterCreate[1:]
+// 		if haveTypeProblem(set, restOfLine) {
+// 			// error logging happens in the helper function
+// 			// TODO send error snapshot
+// 			line, readIndex = nextCreateLine(readIndex, saveFile)
+// 			continue
+// 		}
+
+// 		// 3.2 get desired members from cache
+// 		var membersToAdd map[string]struct{}
+// 		if set.Kind == HashSet {
+// 			membersToAdd = make(map[string]struct{}, len(set.IPPodKey))
+// 			for ip := range set.IPPodKey {
+// 				membersToAdd[ip] = struct{}{}
+// 			}
+// 		} else {
+// 			membersToAdd = make(map[string]struct{}, len(set.IPPodKey))
+// 			for _, member := range set.MemberIPSets {
+// 				membersToAdd[member.HashedName] = struct{}{}
+// 			}
+// 		}
+
+// 		// 3.4 determine which members to add/delete
+// 		membersToDelete := make(map[string]struct{})
+// 		for readIndex < len(saveFile) {
+// 			line, readIndex = parse.Line(readIndex, saveFile)
+// 			if hasPrefix(line, createStringWithSpace) {
+// 				break
+// 			}
+// 			if !hasPrefix(line, addStringWithSpace) {
+// 				klog.Errorf("expected an add line, but got the following line: %s", string(line))
+// 				// TODO send error snapshot
+// 				line, readIndex = nextCreateLine(readIndex, saveFile)
+// 				break
+// 			}
+// 			lineAfterAdd := string(line[len(addStringWithSpace):])
+// 			spaceSplitLineAfterAdd := strings.Split(lineAfterAdd, space)
+// 			parent := spaceSplitLineAfterAdd[0]
+// 			if len(spaceSplitLineAfterAdd) != 2 || parent != hashedName {
+// 				klog.Errorf("expected an add line for set %s in ipset save file, but got the following line: %s", hashedName, string(line))
+// 				// TODO send error snapshot
+// 				line, readIndex = nextCreateLine(readIndex, saveFile)
+// 				break
+// 			}
+// 			member := spaceSplitLineAfterAdd[1]
+
+// 			_, shouldKeep := membersToAdd[member]
+// 			if shouldKeep {
+// 				// member already in the kernel, so don't add it later
+// 				delete(membersToAdd, member)
+// 			} else {
+// 				// member should be deleted from the kernel
+// 				membersToDelete[member] = struct{}{}
+// 			}
+// 		}
+
+// 		// 3.5 delete undesired members from restore file
+// 		sectionID := sectionID(addOrUpdateSectionPrefix, prefixedName)
+// 		for member := range membersToDelete {
+// 			iMgr.deleteMemberForApply(creator, set, sectionID, member)
+// 		}
+// 		// 3.5 add new members to restore file
+// 		for member := range membersToAdd {
+// 			iMgr.addMemberForApply(creator, set, sectionID, member)
+// 		}
+// 	}
+// }
+
+// func nextCreateLine(originalReadIndex int, saveFile []byte) (createLine []byte, nextReadIndex int) {
+// 	nextReadIndex = originalReadIndex
+// 	for nextReadIndex < len(saveFile) {
+// 		createLine, nextReadIndex = parse.Line(nextReadIndex, saveFile)
+// 		if hasPrefix(createLine, createStringWithSpace) {
+// 			return
+// 		}
+// 	}
+// 	return
+// }
+
+// func haveTypeProblem(set *IPSet, restOfSpaceSplitCreateLine []string) bool {
+// 	// TODO check type based on maxelem for hash sets? CIDR blocks have a different maxelem
+// 	if len(restOfSpaceSplitCreateLine) == 0 {
+// 		klog.Error("expected a type specification for the create line but received nothing after the set name")
+// 		return true
+// 	}
+// 	typeString := restOfSpaceSplitCreateLine[0]
+// 	switch typeString {
+// 	case ipsetSetListString:
+// 		if set.Kind != ListSet {
+// 			lineString := fmt.Sprintf("create %s %s", set.HashedName, strings.Join(restOfSpaceSplitCreateLine, " "))
+// 			klog.Errorf("expected to find a ListSet but have the line: %s", lineString)
+// 			return true
+// 		}
+// 	case ipsetNetHashString:
+// 		if set.Kind != HashSet || set.Type == NamedPorts {
+// 			lineString := fmt.Sprintf("create %s %s", set.HashedName, strings.Join(restOfSpaceSplitCreateLine, " "))
+// 			klog.Errorf("expected to find a non-NamedPorts HashSet but have the following line: %s", lineString)
+// 			return true
+// 		}
+// 	case ipsetIPPortHashString:
+// 		if set.Type != NamedPorts {
+// 			lineString := fmt.Sprintf("create %s %s", set.HashedName, strings.Join(restOfSpaceSplitCreateLine, " "))
+// 			klog.Errorf("expected to find a NamedPorts set but have the following line: %s", lineString)
+// 			return true
+// 		}
+// 	default:
+// 		klog.Errorf("unknown type string [%s] in line: %s", typeString, strings.Join(restOfSpaceSplitCreateLine, " "))
+// 		return true
+// 	}
+// 	return false
+// }
+
+// func hasPrefix(line []byte, prefix string) bool {
+// 	return len(line) >= len(prefix) && string(line[:len(prefix)]) == prefix
+// }

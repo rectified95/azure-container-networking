@@ -1392,26 +1392,23 @@ func assertExpectedInfo(t *testing.T, iMgr *IPSetManager, info *expectedInfo) {
 	}
 
 	// 1.2. make sure the toAddOrUpdateCache is equal
-	require.Equal(t, len(info.toAddUpdateCache), len(iMgr.toAddOrUpdateCache), "toAddUpdateCache size mismatch")
+	require.Equal(t, len(info.toAddUpdateCache), iMgr.dirtyCache.numSetsToAddOrUpdate(), "toAddUpdateCache size mismatch")
 	for _, setMetadata := range info.toAddUpdateCache {
 		setName := setMetadata.GetPrefixName()
-		_, ok := iMgr.toAddOrUpdateCache[setName]
-		require.True(t, ok, "set %s not in the toAddUpdateCache")
+		require.True(t, iMgr.dirtyCache.isSetToAddOrUpdate(setName), "set %s not in the toAddUpdateCache")
 		require.True(t, iMgr.exists(setName), "set %s not in the main cache but is in the toAddUpdateCache", setName)
 	}
 
 	// 1.3. make sure the toDeleteCache is equal
-	require.Equal(t, len(info.toDeleteCache), len(iMgr.toDeleteCache), "toDeleteCache size mismatch")
+	require.Equal(t, len(info.toDeleteCache), iMgr.dirtyCache.numSetsToDelete(), "toDeleteCache size mismatch")
 	for _, setName := range info.toDeleteCache {
-		_, ok := iMgr.toDeleteCache[setName]
-		require.True(t, ok, "set %s not found in toDeleteCache", setName)
+		require.True(t, iMgr.dirtyCache.isSetToDelete(setName), "set %s not found in toDeleteCache", setName)
 	}
 
 	// 1.4. assert kernel status of sets in the toAddOrUpdateCache
 	for _, setMetadata := range info.setsForKernel {
 		// check semantics
-		_, ok := iMgr.toAddOrUpdateCache[setMetadata.GetPrefixName()]
-		require.True(t, ok, "setsForKernel should be a subset of toAddUpdateCache")
+		require.True(t, iMgr.dirtyCache.isSetToAddOrUpdate(setMetadata.GetPrefixName()), "setsForKernel should be a subset of toAddUpdateCache")
 
 		setName := setMetadata.GetPrefixName()
 		require.True(t, iMgr.exists(setName), "kernel set %s not found", setName)

@@ -124,7 +124,8 @@ func (iMgr *IPSetManager) applyIPSets() error {
 		}
 	}
 
-	iMgr.toAddOrUpdateCache = make(map[string]struct{})
+	// FIXME uncomment and handle?
+	// iMgr.toAddOrUpdateCache = make(map[string]struct{})
 
 	if len(setPolicyBuilder.toDeleteSets) > 0 {
 		err = iMgr.modifySetPolicies(network, hcn.RequestTypeRemove, setPolicyBuilder.toDeleteSets)
@@ -157,7 +158,7 @@ func (iMgr *IPSetManager) calculateNewSetPolicies(networkPolicies []hcn.NetworkP
 	}
 	existingSets, toDeleteSets := iMgr.segregateSetPolicies(networkPolicies, donotResetIPSets)
 	// some of this below logic can be abstracted a step above
-	toAddUpdateSetNames := iMgr.toAddOrUpdateCache
+	toAddUpdateSetNames := iMgr.dirtyCache.getSetsToAddOrUpdate()
 	setPolicyBuilder.toDeleteSets = toDeleteSets
 
 	// for faster look up changing a slice to map
@@ -168,7 +169,7 @@ func (iMgr *IPSetManager) calculateNewSetPolicies(networkPolicies []hcn.NetworkP
 	// (TODO) remove this log line later
 	klog.Infof("toAddUpdateSetNames %+v \n ", toAddUpdateSetNames)
 	klog.Infof("existingSetNames %+v \n ", existingSetNames)
-	for setName := range toAddUpdateSetNames {
+	for _, setName := range toAddUpdateSetNames {
 		set, exists := iMgr.setMap[setName] // check if the Set exists
 		if !exists {
 			return nil, errors.Errorf(errors.AppendIPSet, false, fmt.Sprintf("ipset %s does not exist", setName))
@@ -276,7 +277,7 @@ func (iMgr *IPSetManager) segregateSetPolicies(networkPolicies []hcn.NetworkPoli
 		if !strings.HasPrefix(set.Id, util.AzureNpmPrefix) {
 			continue
 		}
-		_, ok := iMgr.toDeleteCache[set.Name]
+		ok := iMgr.dirtyCache.isSetToDelete(set.Name)
 		if !ok && !reset {
 			// if the set is not in delete cache, go ahead and add it to update cache
 			toUpdateSets = append(toUpdateSets, set.Name)
