@@ -103,17 +103,6 @@ func getAzureNPMAcceptChainRules() [][]string {
 		{
 			util.IptablesAzureAcceptChain,
 			util.IptablesJumpFlag,
-			util.IptablesMark,
-			util.IptablesSetMarkFlag,
-			util.IptablesAzureClearMarkHex,
-			util.IptablesModuleFlag,
-			util.IptablesCommentModuleFlag,
-			util.IptablesCommentFlag,
-			"Clear-AZURE-NPM-MARKS",
-		},
-		{
-			util.IptablesAzureAcceptChain,
-			util.IptablesJumpFlag,
 			util.IptablesAccept,
 			util.IptablesModuleFlag,
 			util.IptablesCommentModuleFlag,
