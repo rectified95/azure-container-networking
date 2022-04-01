@@ -1579,6 +1579,7 @@ func TestIngressPolicy(t *testing.T) {
 
 func TestEgressPolicy(t *testing.T) {
 	tcp := v1.ProtocolTCP
+	emptyString := intstr.FromString("")
 	targetPodMatchType := policies.EitherMatch
 	peerMatchType := policies.DstMatch
 	tests := []struct {
@@ -1586,6 +1587,7 @@ func TestEgressPolicy(t *testing.T) {
 		targetSelector *metav1.LabelSelector
 		rules          []networkingv1.NetworkPolicyEgressRule
 		npmNetPol      *policies.NPMNetworkPolicy
+		wantErr        bool
 	}{
 		{
 			name: "only port in egress rules",
@@ -1901,6 +1903,50 @@ func TestEgressPolicy(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "error",
+			targetSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"label": "dst",
+				},
+			},
+			rules: []networkingv1.NetworkPolicyEgressRule{
+				{
+					Ports: []networkingv1.NetworkPolicyPort{
+						{
+							Protocol: &tcp,
+							Port:     &emptyString,
+						},
+					},
+				},
+			},
+			npmNetPol: &policies.NPMNetworkPolicy{
+				Name:      "serve-tcp",
+				NameSpace: "default",
+				PodSelectorIPSets: []*ipsets.TranslatedIPSet{
+					ipsets.NewTranslatedIPSet("label:dst", ipsets.KeyValueLabelOfPod),
+					ipsets.NewTranslatedIPSet("default", ipsets.Namespace),
+				},
+				PodSelectorList: []policies.SetInfo{
+					policies.NewSetInfo("label:dst", ipsets.KeyValueLabelOfPod, included, targetPodMatchType),
+					policies.NewSetInfo("default", ipsets.Namespace, included, targetPodMatchType),
+				},
+				ACLs: []*policies.ACLPolicy{
+					{
+						PolicyID:  "azure-acl-default-serve-tcp",
+						Target:    policies.Allowed,
+						Direction: policies.Egress,
+						SrcList:   []policies.SetInfo{},
+						DstList: []policies.SetInfo{
+							policies.NewSetInfo("serve-tcp", ipsets.NamedPorts, included, policies.DstDstMatch),
+						},
+						Protocol: "TCP",
+					},
+					defaultDropACL("default", "serve-tcp", policies.Egress),
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1913,10 +1959,13 @@ func TestEgressPolicy(t *testing.T) {
 			}
 			var err error
 			npmNetPol.PodSelectorIPSets, npmNetPol.PodSelectorList, err = podSelectorWithNS(npmNetPol.NameSpace, policies.EitherMatch, tt.targetSelector)
-			require.NoError(t, err)
 			err = egressPolicy(npmNetPol, tt.rules)
-			require.NoError(t, err)
-			require.Equal(t, tt.npmNetPol, npmNetPol)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.npmNetPol, npmNetPol)
+			}
 		})
 	}
 }
