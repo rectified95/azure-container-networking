@@ -1959,6 +1959,7 @@ func TestEgressPolicy(t *testing.T) {
 			}
 			var err error
 			npmNetPol.PodSelectorIPSets, npmNetPol.PodSelectorList, err = podSelectorWithNS(npmNetPol.NameSpace, policies.EitherMatch, tt.targetSelector)
+			require.NoError(t, err)
 			err = egressPolicy(npmNetPol, tt.rules)
 			if tt.wantErr {
 				require.Error(t, err)
