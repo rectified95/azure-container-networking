@@ -1668,7 +1668,7 @@ func TestIngressPolicy(t *testing.T) {
 			require.NoError(t, err)
 			err = ingressPolicy(npmNetPol, tt.rules)
 			if tt.wantErr {
-
+				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.npmNetPol, npmNetPol)
