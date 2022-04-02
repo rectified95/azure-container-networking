@@ -1936,11 +1936,7 @@ func TestEgressPolicy(t *testing.T) {
 						PolicyID:  "azure-acl-default-serve-tcp",
 						Target:    policies.Allowed,
 						Direction: policies.Egress,
-						SrcList:   []policies.SetInfo{},
-						DstList: []policies.SetInfo{
-							policies.NewSetInfo("serve-tcp", ipsets.NamedPorts, included, policies.DstDstMatch),
-						},
-						Protocol: "TCP",
+						Protocol:  "TCP",
 					},
 					defaultDropACL("default", "serve-tcp", policies.Egress),
 				},
