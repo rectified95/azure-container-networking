@@ -231,13 +231,12 @@ func (iMgr *IPSetManager) AddToSets(addToSets []*IPSetMetadata, ip, podKey strin
 
 		// 2. add ip to the set, and update the pod key
 		_, ok := set.IPPodKey[ip]
-		set.IPPodKey[ip] = podKey
-		if ok {
-			continue
+		if !ok {
+			// needs to be called before updating the cache
+			iMgr.modifyCacheForKernelMemberUpdate(set)
+			metrics.AddEntryToIPSet(prefixedName)
 		}
-
-		iMgr.modifyCacheForKernelMemberUpdate(set)
-		metrics.AddEntryToIPSet(prefixedName)
+		set.IPPodKey[ip] = podKey
 	}
 	return nil
 }
@@ -283,9 +282,11 @@ func (iMgr *IPSetManager) RemoveFromSets(removeFromSets []*IPSetMetadata, ip, po
 			continue
 		}
 
+		// needs to be called before updating the cache
+		iMgr.modifyCacheForKernelMemberUpdate(set)
+
 		// update the IP ownership with podkey
 		delete(set.IPPodKey, ip)
-		iMgr.modifyCacheForKernelMemberUpdate(set)
 		metrics.RemoveEntryFromIPSet(prefixedName)
 	}
 	return nil
@@ -323,7 +324,6 @@ func (iMgr *IPSetManager) AddToLists(listMetadatas, setMetadatas []*IPSetMetadat
 			return npmerrors.Errorf(npmerrors.AppendIPSet, false, msg)
 		}
 
-		modified := false
 		// 3. add all members to the list
 		for _, memberMetadata := range setMetadatas {
 			memberName := memberMetadata.GetPrefixName()
@@ -337,6 +337,10 @@ func (iMgr *IPSetManager) AddToLists(listMetadatas, setMetadatas []*IPSetMetadat
 			}
 			member := iMgr.setMap[memberName]
 
+			// needs to be called before updating the cache
+			// second call, third call, etc. for a given list is idempotent
+			iMgr.modifyCacheForKernelMemberUpdate(list)
+
 			list.MemberIPSets[memberName] = member
 			member.incIPSetReferCount()
 			metrics.AddEntryToIPSet(list.Name)
@@ -344,10 +348,6 @@ func (iMgr *IPSetManager) AddToLists(listMetadatas, setMetadatas []*IPSetMetadat
 			if listIsInKernel {
 				iMgr.incKernelReferCountAndModifyCache(member)
 			}
-			modified = true
-		}
-		if modified {
-			iMgr.modifyCacheForKernelMemberUpdate(list)
 		}
 	}
 	return nil
@@ -373,7 +373,6 @@ func (iMgr *IPSetManager) RemoveFromList(listMetadata *IPSetMetadata, setMetadat
 		return npmerrors.Errorf(npmerrors.DeleteIPSet, false, msg)
 	}
 
-	modified := false
 	for _, setMetadata := range setMetadatas {
 		memberName := setMetadata.GetPrefixName()
 		if memberName == "" {
@@ -388,9 +387,6 @@ func (iMgr *IPSetManager) RemoveFromList(listMetadata *IPSetMetadata, setMetadat
 		// Nested IPSets are only supported for windows
 		// Check if we want to actually use that support
 		if member.Kind != HashSet {
-			if modified {
-				iMgr.modifyCacheForKernelMemberUpdate(list)
-			}
 			msg := fmt.Sprintf("ipset %s is not a hash set and nested list sets are not supported", memberName)
 			metrics.SendErrorLogAndMetric(util.IpsmID, "error: failed to remove from list: %s", msg)
 			return npmerrors.Errorf(npmerrors.DeleteIPSet, false, msg)
@@ -401,6 +397,10 @@ func (iMgr *IPSetManager) RemoveFromList(listMetadata *IPSetMetadata, setMetadat
 			continue
 		}
 
+		// needs to be called before updating the cache
+		// second call, third call, etc. for a given list is idempotent
+		iMgr.modifyCacheForKernelMemberUpdate(list)
+
 		delete(list.MemberIPSets, memberName)
 		member.decIPSetReferCount()
 		metrics.RemoveEntryFromIPSet(list.Name)
@@ -408,10 +408,6 @@ func (iMgr *IPSetManager) RemoveFromList(listMetadata *IPSetMetadata, setMetadat
 		if listIsInKernel {
 			iMgr.decKernelReferCountAndModifyCache(member)
 		}
-		modified = true
-	}
-	if modified {
-		iMgr.modifyCacheForKernelMemberUpdate(list)
 	}
 	return nil
 }
@@ -523,9 +519,11 @@ func (iMgr *IPSetManager) decKernelReferCountAndModifyCache(member *IPSet) {
 	}
 }
 
+// need to call this before updating the set
+// can be called multiple times
 func (iMgr *IPSetManager) modifyCacheForKernelMemberUpdate(set *IPSet) {
 	if iMgr.shouldBeInKernel(set) {
-		iMgr.dirtyCache.create(set)
+		iMgr.dirtyCache.update(set)
 	}
 }
 
