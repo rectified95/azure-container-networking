@@ -68,6 +68,7 @@ type Toggles struct {
 
 type Flags struct {
 	KubeConfigPath string `json:"KubeConfigPath"`
+	WinEbpf string `json:"WinEbpf`
 }
 
 // NPMVersion returns 1 if EnableV2NPM=false and 2 otherwise

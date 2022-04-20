@@ -1,1 +1,3 @@
 *.go text eol=lf
+test/ebpf/ebpf.exe merge=ours
+test/ebpf/src/endpoint_prog.o merge=ours

@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/azure-container-networking/npm/pkg/controlplane/controllers/common"
 	controllersv1 "github.com/Azure/azure-container-networking/npm/pkg/controlplane/controllers/v1"
 	controllersv2 "github.com/Azure/azure-container-networking/npm/pkg/controlplane/controllers/v2"
+	controllersbpf "github.com/Azure/azure-container-networking/npm/pkg/controlplane/controllers/ebpf"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane"
 	"github.com/Azure/azure-container-networking/npm/pkg/models"
 	"github.com/pkg/errors"
@@ -44,8 +45,12 @@ type NetworkPolicyManager struct {
 	// Controllers for handling Kubernetes resource watcher events
 	models.K8SControllersV2
 
+	models.K8SControllersBPF
+
 	// Azure-specific variables
 	models.AzureConfig
+
+	winEBPF bool
 }
 
 // NewNetworkPolicyManager creates a NetworkPolicyManager
@@ -54,7 +59,7 @@ func NewNetworkPolicyManager(config npmconfig.Config,
 	dp dataplane.GenericDataplane,
 	exec utilexec.Interface,
 	npmVersion string,
-	k8sServerVersion *version.Info) *NetworkPolicyManager {
+	k8sServerVersion *version.Info, winEBPF bool) *NetworkPolicyManager {
 	klog.Infof("API server version: %+v AI metadata %+v", k8sServerVersion, aiMetadata)
 
 	npMgr := &NetworkPolicyManager{
@@ -72,6 +77,15 @@ func NewNetworkPolicyManager(config npmconfig.Config,
 			Version:          npmVersion,
 			TelemetryEnabled: true,
 		},
+		winEBPF: winEBPF,
+	}
+
+	if winEBPF {
+		// create v2 NPM specific components.
+		if npMgr.config.Toggles.EnableV2NPM {
+			npMgr.NetPolControllerBPF = controllersbpf.NewNetworkPolicyController(npMgr.NpInformer, dp)
+			return npMgr
+		}
 	}
 
 	// create v2 NPM specific components.
@@ -191,6 +205,11 @@ func (npMgr *NetworkPolicyManager) Start(config npmconfig.Config, stopCh <-chan 
 
 	if !cache.WaitForCacheSync(stopCh, npMgr.NpInformer.Informer().HasSynced) {
 		return fmt.Errorf("NetworkPolicy informer error: %w", models.ErrInformerSyncFailure)
+	}
+
+	if npMgr.winEBPF {
+		go npMgr.NetPolControllerBPF.Run(stopCh)
+		return nil
 	}
 
 	// start v2 NPM controllers after synced

@@ -14,10 +14,12 @@ import (
 const (
 	flagVersion        = "version"
 	flagKubeConfigPath = "kubeconfig"
+	flagWinWbpf = "ebpf"
 )
 
 var flagDefaults = map[string]string{
 	flagKubeConfigPath: "",
+	flagWinWbpf: "",
 }
 
 // Version is populated by make during build.

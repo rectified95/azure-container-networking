@@ -55,6 +55,7 @@ func newStartNPMCmd() *cobra.Command {
 
 			flags := npmconfig.Flags{
 				KubeConfigPath: viper.GetString(flagKubeConfigPath),
+				WinEbpf: viper.GetString(flagWinWbpf),
 			}
 
 			return start(*config, flags)
@@ -62,6 +63,7 @@ func newStartNPMCmd() *cobra.Command {
 	}
 
 	startNPMCmd.Flags().String(flagKubeConfigPath, flagDefaults[flagKubeConfigPath], "path to kubeconfig")
+	startNPMCmd.Flags().String(flagWinWbpf, flagDefaults[flagWinWbpf], "if windows ebpf")
 
 	return startNPMCmd
 }
@@ -137,7 +139,13 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 		}
 		dp.RunPeriodicTasks()
 	}
-	npMgr := npm.NewNetworkPolicyManager(config, factory, dp, exec.New(), version, k8sServerVersion)
+
+	winEBPF := false
+
+	if flags.WinEbpf != "" {
+		winEBPF = true
+	}
+	npMgr := npm.NewNetworkPolicyManager(config, factory, dp, exec.New(), version, k8sServerVersion, winEBPF)
 	err = metrics.CreateTelemetryHandle(config.NPMVersion(), version, npm.GetAIMetadata())
 	if err != nil {
 		klog.Infof("CreateTelemetryHandle failed with error %v. AITelemetry is not initialized.", err)

@@ -5,6 +5,7 @@ package models
 import (
 	controllersv1 "github.com/Azure/azure-container-networking/npm/pkg/controlplane/controllers/v1"
 	controllersv2 "github.com/Azure/azure-container-networking/npm/pkg/controlplane/controllers/v2"
+	controllersbpf "github.com/Azure/azure-container-networking/npm/pkg/controlplane/controllers/ebpf"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/informers"
@@ -26,6 +27,11 @@ type K8SControllersV1 struct {
 	NamespaceControllerV1 *controllersv1.NamespaceController     //nolint:structcheck // false lint error
 	NpmNamespaceCacheV1   *controllersv1.NpmNamespaceCache       //nolint:structcheck // false lint error
 	NetPolControllerV1    *controllersv1.NetworkPolicyController //nolint:structcheck // false lint error
+}
+
+// K8SControllerV1 are the legacy k8s controllers
+type K8SControllersBPF struct {
+	NetPolControllerBPF   *controllersbpf.NetworkPolicyController //nolint:structcheck // false lint error
 }
 
 // K8SControllerV2 are the optimized k8s controllers that replace the legacy controllers
