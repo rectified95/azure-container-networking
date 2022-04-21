@@ -1,0 +1,1 @@
+int test_ebpf_prog();
