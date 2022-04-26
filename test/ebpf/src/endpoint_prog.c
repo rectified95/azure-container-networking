@@ -52,11 +52,16 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
 {
 
     int *verdict = NULL;
-    int32_t *policy_map_fd = bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
+    int32_t *policy_map_fd = (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
+    if (policy_map_fd == NULL)
+    {
+        // if there is no policy map attached to this compartment
+        // then no policy is applied, allow all traffic.
+        return CGROUP_ACT_OK;
+    }
 
     // Look up L4 first
     verdict = bpf_map_lookup_elem(policy_map_fd, &key);
-
     if (verdict == NULL)
     {
         // Look up L3 rules
@@ -64,7 +69,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         verdict = bpf_map_lookup_elem(policy_map_fd, &key);
     }
 
-    return (verdict != NULL) ? *verdict : 1;
+    return (verdict != NULL) ? *verdict : CGROUP_ACT_REJECT;
 }
 
 __inline int
@@ -79,7 +84,13 @@ authorize_v4(bpf_sock_addr_t *ctx, uint8_t direction)
     }
 
     uint32_t *ctx_label_id = NULL;
-    ctx_label_id = bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
+    ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
+    if (ctx_label_id == NULL)
+    {
+        // if there is no Identity assigned then CP is yet to sync
+        // allow all traffic.
+        return CGROUP_ACT_OK;
+    }
 
     policy_map_key_t key = {0};
     key.remote_pod_label = *ctx_label_id;
@@ -101,7 +112,7 @@ authorize_v6(bpf_sock_addr_t *ctx, uint8_t direction)
     }
 
     uint32_t *ctx_label_id = NULL;
-    ctx_label_id = bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
+    ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
 
     policy_map_key_t key = {0};
     key.remote_pod_label = ctx_label_id;

@@ -8,6 +8,9 @@
 #define INGRESS 0
 #define EGRESS 1
 
+#define CGROUP_ACT_OK 0
+#define CGROUP_ACT_REJECT 1
+
 typedef struct policy_map_key
 {
     uint32_t remote_pod_label;
