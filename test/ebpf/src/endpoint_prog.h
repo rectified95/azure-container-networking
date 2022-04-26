@@ -16,11 +16,3 @@ typedef struct policy_map_key
     uint16_t remote_port;
 } policy_map_key_t;
 
-typedef struct ip_address
-{
-    union
-    {
-        uint32_t ipv4; ///< In network byte order.
-        uint8_t ipv6[16];
-    };
-} ip_address_t;
