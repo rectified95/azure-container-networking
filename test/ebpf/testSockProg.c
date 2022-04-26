@@ -63,3 +63,36 @@ struct npm_endpoint_prog_t test_ebpf_prog()
 
     return _npm_endpoint_prog_t;
 }
+
+int attach_progs(npm_endpoint_prog_t npm_ep)
+{
+
+    // attach V4 connect prog
+    int result = bpf_prog_attach(bpf_program__fd(npm_ep.connect4_program), 0, BPF_CGROUP_INET4_CONNECT, 0);
+    if (result != 0)
+    {
+        printf("Error is null while attaching v4 connect prog\n");
+        return result;
+    }
+    // attach V6 connect prog
+    bpf_prog_attach(bpf_program__fd(npm_ep.connect6_program), 0, BPF_CGROUP_INET6_CONNECT, 0);
+    if (result != 0)
+    {
+        printf("Error while attaching v6 connect prog\n");
+        return result;
+    }
+    // attach V4 recv prog
+    bpf_prog_attach(bpf_program__fd(npm_ep.recv4_accept_program), 0, BPF_CGROUP_INET4_RECV_ACCEPT, 0);
+    if (result != 0)
+    {
+        printf("Error is null while attaching v4 recv prog\n");
+        return result;
+    }
+    // attach V6 recv prog
+    bpf_prog_attach(bpf_program__fd(npm_ep.recv6_accept_program), 0, BPF_CGROUP_INET6_RECV_ACCEPT, 0);
+    if (result != 0)
+    {
+        printf("Error is null while attaching v6 recv prog\n");
+        return result;
+    }
+}

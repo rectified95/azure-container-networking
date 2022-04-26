@@ -12,4 +12,7 @@ func main() {
 	r := C.test_ebpf_prog()
 
 	fmt.Println(r)
+
+	res := C.attach_progs(r)
+	fmt.Println(res)
 }
