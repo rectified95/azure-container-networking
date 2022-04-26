@@ -26,7 +26,8 @@ struct bpf_map_def compartment_policy_map = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(policy_map_key_t), // key is remote label id + direction + port/proto
     .value_size = sizeof(uint32_t),       // value is policy ID
-    .max_entries = POLICY_MAP_SIZE};
+    .max_entries = POLICY_MAP_SIZE,
+    .id = POLICY_MAP_ID};
 
 // define the outer map of policy map policy map
 SEC("maps")
@@ -34,8 +35,8 @@ struct bpf_map_def map_policy_maps = {
     .type = BPF_MAP_TYPE_ARRAY_OF_MAPS,
     .key_size = sizeof(uint32_t),   // key is a compartment ID
     .value_size = sizeof(uint32_t), // value is FD of the policy map specific to that compartment
-    .max_entries = MAX_POD_SIZE};   // max number of pods in test cluster
-// .inner_map_id = POLICY_MAP_ID}; ///< id of policy_map in the ELF file
+    .max_entries = MAX_POD_SIZE,   // max number of pods in test cluster
+  .inner_id = POLICY_MAP_ID}; ///< id of policy_map in the ELF file
 
 // declare ipCache map
 SEC("maps")

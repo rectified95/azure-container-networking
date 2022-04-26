@@ -4,6 +4,7 @@
 #define POLICY_MAP_SIZE 200
 #define MAX_POD_SIZE 15
 #define IP_CACHE_MAP_SIZE 1000
+#define POLICY_MAP_ID 10
 
 #define INGRESS 0
 #define EGRESS 1
