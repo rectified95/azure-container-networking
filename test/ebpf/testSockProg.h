@@ -3,6 +3,7 @@
 #include "bpf/libbpf.h"
 
 struct npm_endpoint_prog_t test_ebpf_prog();
+int attach_progs(struct npm_endpoint_prog_t npm_ep);
 
 
 typedef struct bpf_object go_bpf_obj;

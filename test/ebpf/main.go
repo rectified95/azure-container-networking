@@ -7,10 +7,15 @@ package main
 import "C"
 import "fmt"
 
-// go:generate go run github.com/cilium/ebpf/cmd/bpf2go foo src\cgroup_sock_addr.c -- -IC:\Users\azureuser\ebpf-for-windows\include
 func main() {
 	r := C.test_ebpf_prog()
 
+	if (r == C.struct_npm_endpoint_prog_t{}) {
+		fmt.Print("failed to load")
+		return
+	}
+
+	fmt.Print("Done loading progs")
 	fmt.Println(r)
 
 	res := C.attach_progs(r)

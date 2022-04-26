@@ -13,7 +13,7 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     struct npm_endpoint_prog_t _npm_endpoint_prog_t;
     struct bpf_object *object;
     int program_fd;
-    int result = bpf_prog_load("cgroup_sock_addr.o", BPF_PROG_TYPE_CGROUP_SOCK_ADDR, &object, &program_fd);
+    int result = bpf_prog_load("endpoint_prog.o", BPF_PROG_TYPE_CGROUP_SOCK_ADDR, &object, &program_fd);
 
     if (!object)
     {
@@ -24,6 +24,11 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     printf("%d program fd \n", program_fd);
     printf("%d result \n", result);
 
+    if (result < 0 ) {        
+        printf("Load program failed\n");
+        return  _npm_endpoint_prog_t;
+    }
+
     printf("Getting the bpf_prog for connect program\n");
     struct bpf_program *connect_program = bpf_object__find_program_by_name(object, connect4_program_name);
     if (!connect_program)
@@ -33,6 +38,7 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     }
 
     _npm_endpoint_prog_t.connect4_program = connect_program;
+    printf("connect program\n");
 
     struct bpf_program *connect6_program = bpf_object__find_program_by_name(object, connect6_program_name);
     if (!connect6_program)
@@ -42,6 +48,7 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     }
 
     _npm_endpoint_prog_t.connect6_program = connect6_program;
+    printf("connect6 program\n");
 
     struct bpf_program *recv_accept_program = bpf_object__find_program_by_name(object, recv4_accept_program_name);
     if (!recv_accept_program)
@@ -51,6 +58,7 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     }
 
     _npm_endpoint_prog_t.recv4_accept_program = recv_accept_program;
+    printf("recv program\n");
 
     struct bpf_program *recv6_accept_program = bpf_object__find_program_by_name(object, recv6_accept_program_name);
     if (!recv6_accept_program)
@@ -60,13 +68,15 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     }
 
     _npm_endpoint_prog_t.recv4_accept_program = recv6_accept_program;
+    printf("recv6 program\n");
 
     return _npm_endpoint_prog_t;
 }
 
-int attach_progs(npm_endpoint_prog_t npm_ep)
+int attach_progs(struct npm_endpoint_prog_t npm_ep)
 {
-
+    printf("attaching progs\n");
+    printf("attach V4 connect prog\n");
     // attach V4 connect prog
     int result = bpf_prog_attach(bpf_program__fd(npm_ep.connect4_program), 0, BPF_CGROUP_INET4_CONNECT, 0);
     if (result != 0)
@@ -74,6 +84,7 @@ int attach_progs(npm_endpoint_prog_t npm_ep)
         printf("Error is null while attaching v4 connect prog\n");
         return result;
     }
+     printf("attach V6 connect prog\n");
     // attach V6 connect prog
     bpf_prog_attach(bpf_program__fd(npm_ep.connect6_program), 0, BPF_CGROUP_INET6_CONNECT, 0);
     if (result != 0)
@@ -81,6 +92,7 @@ int attach_progs(npm_endpoint_prog_t npm_ep)
         printf("Error while attaching v6 connect prog\n");
         return result;
     }
+     printf("attach V4 recv prog\n");
     // attach V4 recv prog
     bpf_prog_attach(bpf_program__fd(npm_ep.recv4_accept_program), 0, BPF_CGROUP_INET4_RECV_ACCEPT, 0);
     if (result != 0)
@@ -88,6 +100,7 @@ int attach_progs(npm_endpoint_prog_t npm_ep)
         printf("Error is null while attaching v4 recv prog\n");
         return result;
     }
+     printf("attach V6 recv prog\n");
     // attach V6 recv prog
     bpf_prog_attach(bpf_program__fd(npm_ep.recv6_accept_program), 0, BPF_CGROUP_INET6_RECV_ACCEPT, 0);
     if (result != 0)
@@ -95,4 +108,6 @@ int attach_progs(npm_endpoint_prog_t npm_ep)
         printf("Error is null while attaching v6 recv prog\n");
         return result;
     }
+
+     printf("Done attaching progs\n");
 }
