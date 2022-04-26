@@ -6,8 +6,6 @@
 
 struct npm_endpoint_prog_t test_ebpf_prog()
 {
-    
-
     char *connect4_program_name = "authorize_connect4";
     char *connect6_program_name = "authorize_connect6";
     char *recv4_accept_program_name = "authorize_recv_accept4";

@@ -31,10 +31,10 @@ ebpf_map_definition_in_file_t connection_policy_map = {
     .max_entries = 1};
 
 __inline int
-authorize_v4(bpf_sock_addr_t* ctx)
+authorize_v4(bpf_sock_addr_t *ctx)
 {
     connection_tuple_t tuple_key = {0};
-    int* verdict = NULL;
+    int *verdict = NULL;
 
     tuple_key.src_ip.ipv4 = ctx->msg_src_ip4;
     tuple_key.src_port = ctx->msg_src_port;
@@ -48,10 +48,10 @@ authorize_v4(bpf_sock_addr_t* ctx)
 }
 
 __inline int
-authorize_v6(bpf_sock_addr_t* ctx)
+authorize_v6(bpf_sock_addr_t *ctx)
 {
     connection_tuple_t tuple_key = {0};
-    int* verdict;
+    int *verdict;
     __builtin_memcpy(tuple_key.src_ip.ipv6, ctx->msg_src_ip6, sizeof(ctx->msg_src_ip6));
     tuple_key.src_port = ctx->msg_src_port;
     __builtin_memcpy(tuple_key.dst_ip.ipv6, ctx->user_ip6, sizeof(ctx->user_ip6));
@@ -64,29 +64,25 @@ authorize_v6(bpf_sock_addr_t* ctx)
 }
 
 SEC("cgroup/connect4")
-int
-authorize_connect4(bpf_sock_addr_t* ctx)
+int authorize_connect4(bpf_sock_addr_t *ctx)
 {
     return authorize_v4(ctx);
 }
 
 SEC("cgroup/connect6")
-int
-authorize_connect6(bpf_sock_addr_t* ctx)
+int authorize_connect6(bpf_sock_addr_t *ctx)
 {
     return authorize_v6(ctx);
 }
 
 SEC("cgroup/recv_accept4")
-int
-authorize_recv_accept4(bpf_sock_addr_t* ctx)
+int authorize_recv_accept4(bpf_sock_addr_t *ctx)
 {
     return authorize_v4(ctx);
 }
 
 SEC("cgroup/recv_accept6")
-int
-authorize_recv_accept6(bpf_sock_addr_t* ctx)
+int authorize_recv_accept6(bpf_sock_addr_t *ctx)
 {
     return authorize_v6(ctx);
 }
