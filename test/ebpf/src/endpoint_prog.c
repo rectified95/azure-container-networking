@@ -5,15 +5,20 @@
 #include "endpoint_prog.h"
 #include "ebpf_structs.h"
 
+/*
+this below map definition is from test/ebpf/src/cgroup_sock_addr.c
+and is failing at size
 
-typedef struct ip_address
-{
-    union
-    {
-        uint32_t ipv4; ///< In network byte order.
-        uint8_t ipv6[16];
-    };
-} ip_address_t;
+.\endpoint_prog.c:21:6: error: field designator 'size' does not refer to any field in type 'ebpf_map_definition_in_file_t' (aka 'struct _ebpf_map_definition_in_file')
+    .size = sizeof(ebpf_map_definition_in_file_t),
+
+ebpf_map_definition_in_file_t ip_cache_map = {
+    .size = sizeof(ebpf_map_definition_in_file_t),
+    .type = BPF_MAP_TYPE_LPM_TRIE,
+    .key_size = sizeof(ip_address_t),
+    .value_size = sizeof(uint32_t),
+    .max_entries = IP_CACHE_MAP_SIZE};
+*/
 
 // define the policy map
 SEC("maps")
@@ -35,10 +40,10 @@ struct bpf_map_def map_policy_maps = {
 // declare ipCache map
 SEC("maps")
 struct bpf_map_def ip_cache_map = {
-        .type = BPF_MAP_TYPE_LPM_TRIE,
-        .key_size = sizeof(ip_address_t),
-        .value_size = sizeof(uint32_t),
-        .max_entries = IP_CACHE_MAP_SIZE};
+    .type = BPF_MAP_TYPE_LPM_TRIE,
+    .key_size = sizeof(ip_address_t),
+    .value_size = sizeof(uint32_t),
+    .max_entries = IP_CACHE_MAP_SIZE};
 
 // TODO declare identity cache map
 
@@ -47,16 +52,16 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
 {
 
     int *verdict = NULL;
-    int32_t policy_map_fd = bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
+    int32_t *policy_map_fd = bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
 
     // Look up L4 first
-    verdict = bpf_map_lookup_elem(&policy_map_fd, &key);
+    verdict = bpf_map_lookup_elem(policy_map_fd, &key);
 
     if (verdict == NULL)
     {
         // Look up L3 rules
         key.remote_port = 0;
-        verdict = bpf_map_lookup_elem(&policy_map_fd, &key);
+        verdict = bpf_map_lookup_elem(policy_map_fd, &key);
     }
 
     return (verdict != NULL) ? *verdict : 1;
@@ -73,9 +78,11 @@ authorize_v4(bpf_sock_addr_t *ctx, uint8_t direction)
         ip_to_lookup.ipv4 = ctx->user_ip4;
     }
 
-    uint32_t ctx_label_id = bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
+    uint32_t *ctx_label_id = NULL;
+    ctx_label_id = bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
+
     policy_map_key_t key = {0};
-    key.remote_pod_label = ctx_label_id;
+    key.remote_pod_label = *ctx_label_id;
     key.remote_port = ctx->user_port;
     key.protocol = ctx->protocol;
     key.direction = direction;
@@ -93,7 +100,8 @@ authorize_v6(bpf_sock_addr_t *ctx, uint8_t direction)
         __builtin_memcpy(ip_to_lookup.ipv6, ctx->user_ip6, sizeof(ctx->msg_src_ip6));
     }
 
-    uint32_t ctx_label_id = bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
+    uint32_t *ctx_label_id = NULL;
+    ctx_label_id = bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
 
     policy_map_key_t key = {0};
     key.remote_pod_label = ctx_label_id;
