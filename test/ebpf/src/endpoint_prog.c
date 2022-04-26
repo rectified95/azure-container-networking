@@ -2,23 +2,24 @@
 // SPDX-License-Identifier: MIT
 
 #include "bpf_helpers.h"
-#include "ebpf.h"
+#include "ebpf_structs.h"
+#include "ebpf_nethooks.h"
 #include "endpoint_prog.h"
 
 // define the policy map
 SEC("maps")
-struct bpf_map compartment_policy_map = {
+ebpf_map_definition_in_file_t compartment_policy_map = {
+    .size = sizeof(ebpf_map_definition_in_file_t),
     .type = BPF_MAP_TYPE_HASH,
-    .size = sizeof(struct bpf_map),
     .key_size = sizeof(policy_map_key_t), // key is remote label id + direction + port/proto
     .value_size = sizeof(uint32_t),       // value is policy ID
     .max_entries = POLICY_MAP_SIZE};
 
 // define the outer map of policy map policy map
 SEC("maps")
-struct bpf_map map_policy_maps = {
+ebpf_map_definition_in_file_t map_policy_maps = {
+    .size = sizeof(ebpf_map_definition_in_file_t),
     .type = BPF_MAP_TYPE_ARRAY_OF_MAPS,
-    .size = sizeof(struct bpf_map),
     .key_size = sizeof(uint32_t),   // key is a compartment ID
     .value_size = sizeof(uint32_t), // value is FD of the policy map specific to that compartment
     .max_entries = MAX_POD_SIZE};   // max number of pods in test cluster
@@ -26,10 +27,9 @@ struct bpf_map map_policy_maps = {
 
 // declare ipCache map
 SEC("maps")
-struct bpf_map ip_cache_map =
-    {
+ebpf_map_definition_in_file_t ip_cache_map =    {
+        .size = sizeof(ebpf_map_definition_in_file_t),
         .type = BPF_MAP_TYPE_LPM_TRIE,
-        .size = sizeof(struct bpf_map),
         .key_size = sizeof(ip_address_t),
         .value_size = sizeof(uint32_t),
         .max_entries = IP_CACHE_MAP_SIZE};

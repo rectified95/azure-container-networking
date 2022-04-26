@@ -1,5 +1,5 @@
 #include "bpf_helpers.h"
-#include "ebpf.h"
+#include "ebpf_structs.h"
 
 #define POLICY_MAP_SIZE 200
 #define MAX_POD_SIZE 15
