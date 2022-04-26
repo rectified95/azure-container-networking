@@ -52,7 +52,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
 {
 
     int *verdict = NULL;
-    int32_t *policy_map_fd = (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
+    void *policy_map_fd = (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
     if (policy_map_fd == NULL)
     {
         // if there is no policy map attached to this compartment
@@ -115,7 +115,7 @@ authorize_v6(bpf_sock_addr_t *ctx, uint8_t direction)
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
 
     policy_map_key_t key = {0};
-    key.remote_pod_label = ctx_label_id;
+    key.remote_pod_label = *ctx_label_id;
     key.remote_port = ctx->user_port;
     key.protocol = ctx->protocol;
     key.direction = direction;
