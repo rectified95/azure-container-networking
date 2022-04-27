@@ -114,6 +114,12 @@ authorize_v6(bpf_sock_addr_t *ctx, uint8_t direction)
 
     uint32_t *ctx_label_id = NULL;
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
+    if (ctx_label_id == NULL)
+    {
+        // if there is no Identity assigned then CP is yet to sync
+        // allow all traffic.
+        return CGROUP_ACT_OK;
+    }
 
     policy_map_key_t key = {0};
     key.remote_pod_label = *ctx_label_id;
