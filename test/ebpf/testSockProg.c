@@ -101,7 +101,6 @@ int attach_progs(struct npm_endpoint_prog_t npm_ep)
         return result;
     }
      printf("attach V6 recv prog\n");
-    return result;
     // attach V6 recv prog
 
 
