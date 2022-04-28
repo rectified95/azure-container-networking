@@ -101,9 +101,9 @@ int attach_progs(struct npm_endpoint_prog_t npm_ep)
         return result;
     }
      printf("attach V6 recv prog\n");
+    return result;
     // attach V6 recv prog
 
-   printf(npm_ep.recv6_accept_program->object );
 
     bpf_prog_attach(bpf_program__fd(npm_ep.recv6_accept_program), 0, BPF_CGROUP_INET6_RECV_ACCEPT, 0);
     if (result != 0)
