@@ -6,10 +6,10 @@
 
 struct npm_endpoint_prog_t test_ebpf_prog()
 {
-    char *connect4_program_name = "authorize_connect4";
-    char *connect6_program_name = "authorize_connect6";
-    char *recv4_accept_program_name = "authorize_recv_accept4";
-    char *recv6_accept_program_name = "authorize_recv_accept6";
+    const char *connect4_program_name = "authorize_connect4";
+    const char *connect6_program_name = "authorize_connect6";
+    const char *recv4_accept_program_name = "authorize_recv_accept4";
+    const char *recv6_accept_program_name = "authorize_recv_accept6";
     struct npm_endpoint_prog_t _npm_endpoint_prog_t;
     struct bpf_object *object;
     int program_fd;
@@ -21,8 +21,8 @@ struct npm_endpoint_prog_t test_ebpf_prog()
         return _npm_endpoint_prog_t;
     }
     printf("Loaded program\n");
-    printf("%d program fd \n", program_fd);
-    printf("%d result \n", result);
+    printf("%d program fd\n", program_fd);
+    printf("%d result\n", result);
 
     if (result < 0 ) {        
         printf("Load program failed\n");

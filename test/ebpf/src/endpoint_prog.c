@@ -3,7 +3,6 @@
 
 #include "bpf_helpers.h"
 #include "endpoint_prog.h"
-#include "ebpf_structs.h"
 
 /*
 this below map definition is from test/ebpf/src/cgroup_sock_addr.c
@@ -51,7 +50,6 @@ struct bpf_map_def ip_cache_map = {
 __inline int
 _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key)
 {
-
     int *verdict = NULL;
     void *policy_map_fd = (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
     if (policy_map_fd == NULL)
@@ -76,7 +74,6 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
 __inline int
 authorize_v4(bpf_sock_addr_t *ctx, uint8_t direction)
 {
-
     ip_address_t ip_to_lookup = {0};
     ip_to_lookup.ipv4 = ctx->msg_src_ip4;
     if (direction == INGRESS)
