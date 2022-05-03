@@ -4,7 +4,6 @@
 #include "bpf/bpf.h"
 #include "bpf/libbpf.h"
 #include "testSockProg.h"
-#include "src/endpoint_prog.h"
 
 struct npm_endpoint_prog_t test_ebpf_prog()
 {
@@ -126,9 +125,27 @@ char *get_map_pin_path(const char *map_name)
     return map_pin_path;
 }
 
-fd_t get_map_fd(map_type_t internal_map_type, int compartment_id)
+char *get_epmap_name(int internal_map_type, int comp_id)
 {
-    char *map_name = get_map_name(internal_map_type, compartment_id);
+    switch (internal_map_type)
+    {
+    case COMP_POLICY_MAP:
+    {
+        int map_name_size = (sizeof(char) * strlen(COMP_PMAP_NAME_PREFIX)) + sizeof(int);
+        char full_map_name[map_name_size];
+        snprintf(&full_map_name, map_name_size, "%s%d", COMP_PMAP_NAME_PREFIX, comp_id);
+        return &full_map_name;
+    }
+    case GLOBAL_POLICY_MAP:
+        return GLOBAL_PMAP_NAME;
+    case IP_CACHE_MAP:
+        return IP_CACHE_MAP_NAME;
+    }
+}
+
+fd_t get_map_fd(int internal_map_type, int compartment_id)
+{
+    char *map_name = get_epmap_name(internal_map_type, compartment_id);
 
     // Map fd is invalid. Open fd to the map.
     char *pin_path = get_map_pin_path(map_name);
@@ -172,7 +189,7 @@ fd_t get_map_fd(map_type_t internal_map_type, int compartment_id)
 int update_global_policy_map(fd_t compartment_policy_map_fd, int compartment_id)
 {
     printf("Updating comp policy map\n");
-    fd_t global_policy_map_fd = get_map_fd(GLOBAL_PMAP_NAME, 0);
+    fd_t global_policy_map_fd = get_map_fd(GLOBAL_POLICY_MAP, 0);
     if (global_policy_map_fd == INVALID_MAP_FD)
     {
         return INVALID_MAP_FD;
@@ -187,43 +204,52 @@ int update_global_policy_map(fd_t compartment_policy_map_fd, int compartment_id)
     }
 }
 
-char *get_map_name(map_type_t internal_map_type, int comp_id)
-{
-    switch (internal_map_type)
-    {
-    case COMP_POLICY_MAP:
-    {
-        int map_name_size = (sizeof(char) * strlen(COMP_PMAP_NAME_PREFIX)) + sizeof(int);
-        char full_map_name[map_name_size];
-        snprintf(&full_map_name, map_name_size, "%s%d", COMP_PMAP_NAME_PREFIX, comp_id);
-        return &full_map_name;
-    }
-    case GLOBAL_POLICY_MAP:
-        return GLOBAL_PMAP_NAME;
-    case IP_CACHE_MAP:
-        return IP_CACHE_MAP_NAME;
-    }
-}
-
 fd_t create_bpf_map(map_type_t internal_map_type)
 {
-    map_properties_t *map_props;
+    //struct _map_properties *map_props;
+
+    int map_type = 0;
+    int key_size = 0;
+    int value_size = 0;
+    int max_entries = 0;
+    
+
+    struct _map_properties *comp_policy_map_properties = {
+        BPF_MAP_TYPE_HASH, sizeof(policy_map_key_t), sizeof(uint32_t), POLICY_MAP_SIZE
+    };
+
+    struct _map_properties *global_policy_map_properties = {
+        BPF_MAP_TYPE_ARRAY_OF_MAPS, sizeof(uint32_t), sizeof(uint32_t), MAX_POD_SIZE
+    };
+
+    struct _map_properties *ip_cache_map_properties = {
+        BPF_MAP_TYPE_LPM_TRIE,  sizeof(ip_address_t), sizeof(uint32_t), IP_CACHE_MAP_SIZE
+    };
 
     switch (internal_map_type)
     {
     case COMP_POLICY_MAP:
-        map_props = comp_policy_map_properties;
+        map_type = comp_policy_map_properties->map_type;
+        key_size = comp_policy_map_properties->key_size;
+        value_size = comp_policy_map_properties->value_size;
+        max_entries = comp_policy_map_properties->map_type;
         break;
     case GLOBAL_POLICY_MAP:
-        map_props = global_policy_map_properties;
+        map_type = global_policy_map_properties->map_type;
+        key_size = global_policy_map_properties->key_size;
+        value_size = global_policy_map_properties->value_size;
+        max_entries = global_policy_map_properties->map_type;
         break;
     case IP_CACHE_MAP:
-        map_props = ip_cache_map_properties;
+        map_type = ip_cache_map_properties->map_type;
+        key_size = ip_cache_map_properties->key_size;
+        value_size = ip_cache_map_properties->value_size;
+        max_entries = ip_cache_map_properties->map_type;
         break;
     }
 
     fd_t inner_map_fd =
-        bpf_create_map(map_props->map_type, map_props->key_size, map_props->value_size, map_props->max_entries, 0);
+        bpf_create_map(map_type, key_size, value_size, max_entries, 0);
     if (inner_map_fd < 0)
     {
         return INVALID_MAP_FD;
@@ -269,7 +295,7 @@ int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint1
     return 0;
 }
 
-int update_ip_cache4(uint32_t *ctx_label_id, uint32_t ipv4, bool delete)
+int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4, bool delete)
 {
     printf("Updating ip cache map\n");
     fd_t ip_cache_map_fd = get_map_fd(IP_CACHE_MAP, 0);
@@ -284,7 +310,7 @@ int update_ip_cache4(uint32_t *ctx_label_id, uint32_t ipv4, bool delete)
 
     if (!delete)
     {
-        int result = bpf_map_update_elem(ip_cache_map_fd, &ip_cache_key, ctx_label_id, BPF_ANY);
+        int result = bpf_map_update_elem(ip_cache_map_fd, &ip_cache_key, &ctx_label_id, BPF_ANY);
         if (result != 0)
         {
             printf("Error while updating ip cache map\n");

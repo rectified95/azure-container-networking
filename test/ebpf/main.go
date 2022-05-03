@@ -51,8 +51,15 @@ func initialize() int {
 	return 0
 }
 
-func update_comp_policy_map(remote_label_id, remote_port, policy_id, compartment_id int, dir direction, delete bool) int {
-	res := C.update_comp_policy_map(remote_label_id, direction, remote_port, compartment_id, policy_id, delete)
+func gupdate_comp_policy_map(remote_label_id, remote_port, policy_id, compartment_id int, dir direction, delete bool) int {
+	res := C.update_comp_policy_map(
+		C.int(remote_label_id),
+		C.direction_t(dir),
+		C.uint16_t(remote_port),
+		C.int(compartment_id),
+		C.int(policy_id),
+		C.bool(delete),
+	)
 	if res < 0 {
 		fmt.Println("Error: Could not update comp policy map")
 		return RET_ERR
@@ -60,8 +67,9 @@ func update_comp_policy_map(remote_label_id, remote_port, policy_id, compartment
 	return 0
 }
 
-func update_ip_cache(remote_label_id int, ip net.IP, delete bool) int {
-	res := C.update_ip_cache(remote_label_id, ip2int(ip), delete)
+func gupdate_ip_cache(remote_label_id uint32, ip net.IP, delete bool) int {
+
+	res := C.update_ip_cache4(C.uint32_t(remote_label_id), C.uint32_t(ip2int(ip)), C.bool(delete))
 	if res < 0 {
 		fmt.Println("Error: Could not update ip cache")
 		return RET_ERR

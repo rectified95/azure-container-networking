@@ -9,10 +9,45 @@
 #define GLOBAL_PMAP_NAME "map_policy_maps"
 #define IP_CACHE_MAP_NAME "ip_cache_map"
 
+#define POLICY_MAP_SIZE 200
+#define MAX_POD_SIZE 15
+#define IP_CACHE_MAP_SIZE 1000
+#define POLICY_MAP_ID 10
+
+typedef enum direction
+{
+    INGRESS,
+    EGRESS,
+} direction_t;
+
+#define CGROUP_ACT_OK 0
+#define CGROUP_ACT_REJECT 1
+
+typedef struct policy_map_key
+{
+    uint32_t remote_pod_label_id;
+    // uint8_t protocol;  by default, we are using TCP protocol
+    uint8_t direction;
+    uint16_t remote_port;
+} policy_map_key_t;
+
+typedef struct ip_address
+{
+    union
+    {
+        uint32_t ipv4; ///< In network byte order.
+        uint8_t ipv6[16];
+    };
+} ip_address_t;
+
 struct npm_endpoint_prog_t test_ebpf_prog();
 int attach_progs(struct npm_endpoint_prog_t npm_ep);
+int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint16_t remote_port, int compartment_id, int policy_id, bool delete);
+int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4, bool delete);
+
 
 typedef struct bpf_object go_bpf_obj;
+typedef int32_t fd_t;
 
 typedef enum map_types
 {
@@ -21,37 +56,12 @@ typedef enum map_types
     IP_CACHE_MAP,
 } map_type_t;
 
-typedef struct _map_properties
+struct _map_properties
 {
-    map_type_t internal_map_type;
     int map_type;
     int key_size;
     int value_size;
     int max_entries;
-} map_properties_t;
-
-const struct map_properties_t *comp_policy_map_properties = {
-    .map_type = BPF_MAP_TYPE_HASH,
-    .internal_map_type = COMP_POLICY_MAP,
-    .key_size = sizeof(policy_map_key_t),
-    .value_size = sizeof(uint32_t),
-    .max_entries = POLICY_MAP_SIZE,
-};
-
-const struct map_properties_t *global_policy_map_properties = {
-    .map_type = BPF_MAP_TYPE_ARRAY_OF_MAPS,
-    .internal_map_type = GLOBAL_POLICY_MAP,
-    .key_size = sizeof(uint32_t),
-    .value_size = sizeof(uint32_t),
-    .max_entries = MAX_POD_SIZE,
-};
-
-const struct map_properties_t *ip_cache_map_properties = {
-    .map_type = BPF_MAP_TYPE_LPM_TRIE,
-    .internal_map_type = IP_CACHE_MAP,
-    .key_size = sizeof(ip_address_t),
-    .value_size = sizeof(uint32_t),
-    .max_entries = IP_CACHE_MAP_SIZE,
 };
 
 struct npm_endpoint_prog_t

@@ -47,6 +47,21 @@ struct bpf_map_def ip_cache_map = {
 
 // TODO declare identity cache map
 
+
+__inline void
+print_trace(bpf_sock_addr_t *ctx, char *msg)
+{
+    /*
+    char packet_info[256];
+    bpf_snprintf(packet_info, sizeof(packet_info),  "Packet info: Src IP: %x, Dst IP: %x, Src Port: %d, Dst Port: %d, Compartment ID: %d\n", ctx->msg_src_ip4, ctx->user_ip4, ctx->user_port, ctx->user_port, ctx->compartment_id);
+
+    char print_msg[1024];
+    bpf_snprintf(print_msg, sizeof(print_msg),  "%s. %s\n", msg ,packet_info);
+    bpf_trace_printk(print_msg, sizeof(print_msg));
+    */
+    bpf_trace_printk(msg, sizeof(msg));
+}
+
 __inline int
 _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key)
 {
@@ -65,7 +80,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
     if (verdict != NULL)
     {
         char msg[128];
-        bpf_snprintf(msg, sizeof(msg), "Policy Eval: L4 policy ID %d Allowed.", *verdict, sizeof(*verdict));
+        bpf_snprintf(msg, sizeof(msg), "Policy Eval: L4 policy ID %lu Allowed.", (unsigned long *) verdict, sizeof(verdict));
         print_trace(ctx, msg);
         return CGROUP_ACT_OK;
     }
@@ -76,7 +91,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
     if (verdict != NULL)
     {
         char msg[128];
-        bpf_snprintf(msg, sizeof(msg), "Policy Eval: L3 policy ID %d Allowed.", *verdict, sizeof(*verdict));
+        bpf_snprintf(msg, sizeof(msg), "Policy Eval: L3 policy ID %lu Allowed.", (unsigned long *) verdict, sizeof(verdict));
         print_trace(ctx, msg);
         return CGROUP_ACT_OK;
     }
@@ -140,12 +155,6 @@ authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
     key.direction = dir;
 
     return _policy_eval(ctx, ctx->compartment_id, key);
-}
-
-__inline void
-print_trace(bpf_sock_addr_t *ctx, char *msg)
-{
-    bpf_printk("%s. Packet info: Src IP: %x, Dst IP: %x, Src Port: %d, Dst Port: %d, Compartment ID: %d\n", msg, ctx->msg_src_ip4, ctx->msg_dst_ip4, ctx->user_port, ctx->msg_dst_port, ctx->compartment_id);
 }
 
 SEC("cgroup/connect4")
