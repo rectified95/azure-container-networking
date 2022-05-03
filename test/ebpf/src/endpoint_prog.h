@@ -5,16 +5,19 @@
 #define IP_CACHE_MAP_SIZE 1000
 #define POLICY_MAP_ID 10
 
-#define INGRESS 0
-#define EGRESS 1
+typedef enum direction
+{
+    INGRESS,
+    EGRESS,
+} direction_t;
 
 #define CGROUP_ACT_OK 0
 #define CGROUP_ACT_REJECT 1
 
 typedef struct policy_map_key
 {
-    uint32_t remote_pod_label;
-    uint8_t protocol;
+    uint32_t remote_pod_label_id;
+    // uint8_t protocol;  by default, we are using TCP protocol
     uint8_t direction;
     uint16_t remote_port;
 } policy_map_key_t;
