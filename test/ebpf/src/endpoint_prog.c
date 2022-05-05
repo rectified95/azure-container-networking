@@ -94,7 +94,9 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         ip_to_lookup.ipv4 = ctx->user_ip4;
     }
 
-    int32_t *policy_map_fd =  (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &ctx->compartment_id);
+/*
+    uint32_t comp_id =  ctx->compartment_id;
+    int32_t *policy_map_fd =  (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &comp_id);
     if (policy_map_fd == NULL)
     {
         bpf_printk("Policy Eval: No policy map for compartment");
@@ -102,6 +104,7 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         // then no policy is applied, allow all traffic.
         return CGROUP_ACT_OK;
     }
+    */
 
     uint32_t *ctx_label_id = NULL;
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
