@@ -173,7 +173,7 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
         if (internal_map_type == COMP_POLICY_MAP)
         {
             // Update the global map now
-            int result = update_global_policy_map(fd, compartment_id);
+            int result = update_global_policy_map(compartment_id);
             if (result != 0)
             {
                 return INVALID_MAP_FD;
@@ -186,8 +186,14 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
     return INVALID_MAP_FD;
 }
 
-int update_global_policy_map(fd_t compartment_policy_map_fd, int compartment_id)
+int update_global_policy_map(int compartment_id)
 {
+    fd_t compartment_policy_map_fd = get_map_fd(COMP_POLICY_MAP, 0);
+    if (compartment_policy_map_fd == INVALID_MAP_FD)
+    {
+        return -1;
+    }
+
     printf("Updating comp policy map\n");
     fd_t global_policy_map_fd = get_map_fd(GLOBAL_POLICY_MAP, 0);
     if (global_policy_map_fd == INVALID_MAP_FD)
@@ -206,25 +212,21 @@ int update_global_policy_map(fd_t compartment_policy_map_fd, int compartment_id)
 
 fd_t create_bpf_map(map_type_t internal_map_type)
 {
-    //struct _map_properties *map_props;
+    // struct _map_properties *map_props;
 
     int map_type = 0;
     int key_size = 0;
     int value_size = 0;
     int max_entries = 0;
-    
 
     struct _map_properties *comp_policy_map_properties = {
-        BPF_MAP_TYPE_HASH, sizeof(policy_map_key_t), sizeof(uint32_t), POLICY_MAP_SIZE
-    };
+        BPF_MAP_TYPE_HASH, sizeof(policy_map_key_t), sizeof(uint32_t), POLICY_MAP_SIZE};
 
     struct _map_properties *global_policy_map_properties = {
-        BPF_MAP_TYPE_ARRAY_OF_MAPS, sizeof(uint32_t), sizeof(uint32_t), MAX_POD_SIZE
-    };
+        BPF_MAP_TYPE_ARRAY_OF_MAPS, sizeof(uint32_t), sizeof(uint32_t), MAX_POD_SIZE};
 
     struct _map_properties *ip_cache_map_properties = {
-        BPF_MAP_TYPE_LPM_TRIE,  sizeof(ip_address_t), sizeof(uint32_t), IP_CACHE_MAP_SIZE
-    };
+        BPF_MAP_TYPE_LPM_TRIE, sizeof(ip_address_t), sizeof(uint32_t), IP_CACHE_MAP_SIZE};
 
     switch (internal_map_type)
     {

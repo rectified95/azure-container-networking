@@ -47,7 +47,6 @@ struct bpf_map_def ip_cache_map = {
 
 // TODO declare identity cache map
 
-
 __inline int
 _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key)
 {
@@ -65,9 +64,9 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
     verdict = bpf_map_lookup_elem(policy_map_fd, &key);
     if (verdict != NULL)
     {
-        //char msg[128];
-        bpf_printk("Policy Eval: L4 policy ID %i Allowed.", *verdict);
-        //bpf_printk(msg);
+        // char msg[128];
+        bpf_printk("Policy Eval: L4 policy ID %lu Allowed.", *verdict);
+        // bpf_printk(msg);
         return CGROUP_ACT_OK;
     }
 
@@ -76,9 +75,9 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
     verdict = bpf_map_lookup_elem(policy_map_fd, &key);
     if (verdict != NULL)
     {
-        //char msg[128];
+        // char msg[128];
         bpf_printk("Policy Eval: L3 policy ID %lu Allowed.", *verdict);
-        //bpf_printk(msg);
+        // bpf_printk(msg);
         return CGROUP_ACT_OK;
     }
 
@@ -95,14 +94,23 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         ip_to_lookup.ipv4 = ctx->user_ip4;
     }
 
+    int32_t *policy_map_fd =  (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &ctx->compartment_id);
+    if (policy_map_fd == NULL)
+    {
+        bpf_printk("Policy Eval: No policy map for compartment");
+        // if there is no policy map attached to this compartment
+        // then no policy is applied, allow all traffic.
+        return CGROUP_ACT_OK;
+    }
+
     uint32_t *ctx_label_id = NULL;
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     {
-        bpf_printk("No label found for IP");
+        bpf_printk("No label found for IP, dropping packet.");
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
-        return CGROUP_ACT_OK;
+        return CGROUP_ACT_REJECT;
     }
 
     policy_map_key_t key = {0};
@@ -124,14 +132,26 @@ authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
         __builtin_memcpy(ip_to_lookup.ipv6, ctx->user_ip6, sizeof(ctx->msg_src_ip6));
     }
 
+    /* with this below check for some reason verification fails.
+    
+    int32_t *policy_map_fd =  (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &ctx->compartment_id);
+    if (policy_map_fd == NULL)
+    {
+        bpf_printk("Policy Eval: No policy map for compartment");
+        // if there is no policy map attached to this compartment
+        // then no policy is applied, allow all traffic.
+        return CGROUP_ACT_OK;
+    }
+    */
+
     uint32_t *ctx_label_id = NULL;
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     {
-        bpf_printk("No label found for IP");
+        bpf_printk("No label found for IP, dropping packet.");
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
-        return CGROUP_ACT_OK;
+        return CGROUP_ACT_REJECT;
     }
 
     policy_map_key_t key = {0};
