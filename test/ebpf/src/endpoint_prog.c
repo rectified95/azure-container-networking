@@ -51,7 +51,7 @@ struct bpf_map_def ip_cache_map = {
 __inline int
 _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key)
 {
-    int *verdict = NULL;
+    uint32_t *verdict = NULL;
     void *policy_map_fd = (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
     if (policy_map_fd == NULL)
     {
@@ -66,7 +66,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
     if (verdict != NULL)
     {
         //char msg[128];
-        bpf_printk("Policy Eval: L4 policy ID %lu Allowed.", *(unsigned long *) verdict);
+        bpf_printk("Policy Eval: L4 policy ID %i Allowed.", *verdict);
         //bpf_printk(msg);
         return CGROUP_ACT_OK;
     }
@@ -77,7 +77,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
     if (verdict != NULL)
     {
         //char msg[128];
-        bpf_printk("Policy Eval: L3 policy ID %lu Allowed.", *(unsigned long *) verdict);
+        bpf_printk("Policy Eval: L3 policy ID %lu Allowed.", *verdict);
         //bpf_printk(msg);
         return CGROUP_ACT_OK;
     }
