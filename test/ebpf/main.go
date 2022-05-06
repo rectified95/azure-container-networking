@@ -54,10 +54,16 @@ func initialize() int {
 		return RET_ERR
 	}
 
+	fmt.Println("running our scenario")
+	res1 := test_scenario()
+	if res1 < 0 {
+		return RET_ERR
+	}
+
 	return 0
 }
 
-func test_scenario() {
+func test_scenario() int {
 	// 85-testing cluster
 	// block all traffic on pod with IP 10.240.0.37
 	// which is win-webserver-7b7d755975-hxswl with
@@ -85,11 +91,11 @@ func test_scenario() {
 	retCode := C.update_global_policy_map(C.int(compID))
 	if retCode < 0 {
 		fmt.Println("Error: Could not get comp map fd")
-		return
+		return -1
 	}
 
 	fmt.Println("All traffic should be dropped here")
-
+	return 0
 }
 
 func gupdate_comp_policy_map(remote_label_id, remote_port, policy_id, compartment_id int, dir direction, delete bool) int {
