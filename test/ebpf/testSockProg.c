@@ -5,6 +5,59 @@
 #include "bpf/libbpf.h"
 #include "testSockProg.h"
 
+
+
+char *get_map_pin_path(const char *map_name)
+{
+    char *map_pin_path = malloc(sizeof(char) * (strlen(map_name) + strlen(DEFAULT_MAP_PIN_PATH_PREFIX) + 1));
+    strcpy(map_pin_path, DEFAULT_MAP_PIN_PATH_PREFIX);
+    strcat(map_pin_path, map_name);
+    return map_pin_path;
+}
+
+char *get_epmap_name(int internal_map_type, int comp_id)
+{
+    switch (internal_map_type)
+    {
+    case COMP_POLICY_MAP:
+    {
+        int map_name_size = (sizeof(char) * strlen(COMP_PMAP_NAME_PREFIX)) + sizeof(int);
+        char full_map_name[map_name_size];
+        snprintf(&full_map_name, map_name_size, "%s%d", COMP_PMAP_NAME_PREFIX, comp_id);
+        return &full_map_name;
+    }
+    case GLOBAL_POLICY_MAP:
+        return GLOBAL_PMAP_NAME;
+    case IP_CACHE_MAP:
+        return IP_CACHE_MAP_NAME;
+    }
+}
+
+int pin_given_map(int internal_map_type, fd_t fd){
+    char *map_name = get_epmap_name(internal_map_type, POLICY_MAP_ID);
+
+    // Map fd is invalid. Open fd to the map.
+    char *pin_path = get_map_pin_path(map_name);    
+    printf("pin_given_map: map pinned path %s\n", pin_path);
+    fd_t fdnew = bpf_obj_get(pin_path);
+    if (fdnew != INVALID_MAP_FD)
+    {
+        printf("pin_given_map: found the pinned map FD\n");
+        return 0;
+    }
+
+    printf("pin_given_map: pinned map not found, creating pin for map %s\n", map_name);    
+    // Map created. Now pin the map.
+    int error = bpf_obj_pin(fd, pin_path);
+    if (error != 0)
+    {
+        // close map fd.
+        _close(fd);
+        return -1;
+    }
+    return 0;
+}
+
 struct npm_endpoint_prog_t test_ebpf_prog()
 {
     const char *connect4_program_name = "authorize_connect4";
@@ -72,7 +125,47 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     }
 
     _npm_endpoint_prog_t.recv4_accept_program = recv6_accept_program;
-    printf("recv6 program\n");
+    printf("recv6 program\n");    
+    printf("Now getting MAP fds and pinning them\n");
+
+    struct bpf_map* comp_policy_map_obj = bpf_object__find_map_by_name(object, "compartment_policy_map");
+    if (comp_policy_map_obj == NULL) {
+        printf("comp policy map is null\n");
+        return _npm_endpoint_prog_t;
+    }
+
+    int err = pin_given_map(COMP_POLICY_MAP ,bpf_map__fd(comp_policy_map_obj));
+    if (err < 0) {
+        printf("Failed to pin COMP POLICY MAP\n");
+        return _npm_endpoint_prog_t;
+    }
+    printf("DONE pinning COMP POLICY MAP\n");    
+
+    struct bpf_map* map_policy_maps_obj = bpf_object__find_map_by_name(object, "map_policy_maps");
+    if (map_policy_maps_obj == NULL) {
+        printf("global policy map is null\n");
+        return _npm_endpoint_prog_t;
+    }
+
+    err = pin_given_map(GLOBAL_POLICY_MAP ,bpf_map__fd(map_policy_maps_obj));
+    if (err < 0) {
+        printf("Failed to pin GLOBAL POLICY MAP\n");
+        return _npm_endpoint_prog_t;
+    }
+    printf("DONE pinning GLOBAL POLICY MAP\n");
+
+    struct bpf_map* ip_cache_map_obj = bpf_object__find_map_by_name(object, "ip_cache_map");
+    if (ip_cache_map_obj == NULL) {
+        printf("ip cache map is null\n");
+        return _npm_endpoint_prog_t;
+    }
+
+    err = pin_given_map(IP_CACHE_MAP ,bpf_map__fd(ip_cache_map_obj));
+    if (err < 0) {
+        printf("Failed to pin ip cache MAP\n");
+        return _npm_endpoint_prog_t;
+    }
+    printf("DONE pinning ip cache MAP\n");
 
     return _npm_endpoint_prog_t;
 }
@@ -117,30 +210,52 @@ int attach_progs(struct npm_endpoint_prog_t npm_ep)
     printf("Done attaching progs\n");
 }
 
-char *get_map_pin_path(const char *map_name)
+fd_t create_bpf_map(map_type_t internal_map_type)
 {
-    char *map_pin_path = malloc(sizeof(char) * (strlen(map_name) + strlen(DEFAULT_MAP_PIN_PATH_PREFIX) + 1));
-    strcpy(map_pin_path, DEFAULT_MAP_PIN_PATH_PREFIX);
-    strcat(map_pin_path, map_name);
-    return map_pin_path;
-}
+    // struct _map_properties *map_props;
+    printf("In create bpf map \n");
+    ebpf_map_type_t map_type = 0;
+    int key_size = 0;
+    int value_size = 0;
+    int max_entries = 0;
 
-char *get_epmap_name(int internal_map_type, int comp_id)
-{
+    printf("internal map type %d\n", internal_map_type);
     switch (internal_map_type)
     {
     case COMP_POLICY_MAP:
-    {
-        int map_name_size = (sizeof(char) * strlen(COMP_PMAP_NAME_PREFIX)) + sizeof(int);
-        char full_map_name[map_name_size];
-        snprintf(&full_map_name, map_name_size, "%s%d", COMP_PMAP_NAME_PREFIX, comp_id);
-        return &full_map_name;
-    }
+        printf("in comp switch\n");
+        map_type = BPF_MAP_TYPE_HASH;
+        key_size = sizeof(policy_map_key_t);
+        value_size = sizeof(uint32_t);
+        max_entries = POLICY_MAP_SIZE;
+        
+        printf("after comp switch\n");
+        break;
     case GLOBAL_POLICY_MAP:
-        return GLOBAL_PMAP_NAME;
+        map_type = BPF_MAP_TYPE_ARRAY_OF_MAPS;
+        key_size = sizeof(uint32_t);
+        value_size = sizeof(uint32_t);
+        max_entries = MAX_POD_SIZE;
+        break;
     case IP_CACHE_MAP:
-        return IP_CACHE_MAP_NAME;
+        printf("in ipcache switch\n");
+        map_type = BPF_MAP_TYPE_LPM_TRIE;
+        key_size = sizeof(ip_address_t);
+        value_size = sizeof(uint32_t);
+        max_entries = IP_CACHE_MAP_SIZE;
+        break;
     }
+
+    printf("Just before creating the map\n");
+    fd_t inner_map_fd =
+        bpf_create_map(map_type, key_size, value_size, max_entries, 0);
+    if (inner_map_fd < 0)
+    {
+        printf("FAILED creating the map\n");
+        return INVALID_MAP_FD;
+    }
+
+    return inner_map_fd;
 }
 
 fd_t get_map_fd(int internal_map_type, int compartment_id)
@@ -148,10 +263,12 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
     char *map_name = get_epmap_name(internal_map_type, compartment_id);
 
     // Map fd is invalid. Open fd to the map.
-    char *pin_path = get_map_pin_path(map_name);
+    char *pin_path = get_map_pin_path(map_name);    
+    printf("get_map_fd: map pinned path %s\n", pin_path);
     fd_t fd = bpf_obj_get(pin_path);
     if (fd != INVALID_MAP_FD)
     {
+        printf("get_map_fd: found the pinned map FD\n");
         return fd;
     }
 
@@ -183,6 +300,8 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
         return fd;
     }
 
+    printf("get_map_fd: failed to create the MAP\n");
+
     return INVALID_MAP_FD;
 }
 
@@ -208,56 +327,6 @@ int update_global_policy_map(int compartment_id)
         printf("Error while updating global policy map\n");
         return error;
     }
-}
-
-fd_t create_bpf_map(map_type_t internal_map_type)
-{
-    // struct _map_properties *map_props;
-
-    int map_type = 0;
-    int key_size = 0;
-    int value_size = 0;
-    int max_entries = 0;
-
-    struct _map_properties *comp_policy_map_properties = {
-        BPF_MAP_TYPE_HASH, sizeof(policy_map_key_t), sizeof(uint32_t), POLICY_MAP_SIZE};
-
-    struct _map_properties *global_policy_map_properties = {
-        BPF_MAP_TYPE_ARRAY_OF_MAPS, sizeof(uint32_t), sizeof(uint32_t), MAX_POD_SIZE};
-
-    struct _map_properties *ip_cache_map_properties = {
-        BPF_MAP_TYPE_LPM_TRIE, sizeof(ip_address_t), sizeof(uint32_t), IP_CACHE_MAP_SIZE};
-
-    switch (internal_map_type)
-    {
-    case COMP_POLICY_MAP:
-        map_type = comp_policy_map_properties->map_type;
-        key_size = comp_policy_map_properties->key_size;
-        value_size = comp_policy_map_properties->value_size;
-        max_entries = comp_policy_map_properties->map_type;
-        break;
-    case GLOBAL_POLICY_MAP:
-        map_type = global_policy_map_properties->map_type;
-        key_size = global_policy_map_properties->key_size;
-        value_size = global_policy_map_properties->value_size;
-        max_entries = global_policy_map_properties->map_type;
-        break;
-    case IP_CACHE_MAP:
-        map_type = ip_cache_map_properties->map_type;
-        key_size = ip_cache_map_properties->key_size;
-        value_size = ip_cache_map_properties->value_size;
-        max_entries = ip_cache_map_properties->map_type;
-        break;
-    }
-
-    fd_t inner_map_fd =
-        bpf_create_map(map_type, key_size, value_size, max_entries, 0);
-    if (inner_map_fd < 0)
-    {
-        return INVALID_MAP_FD;
-    }
-
-    return inner_map_fd;
 }
 
 int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint16_t remote_port, int compartment_id, int policy_id, bool delete)
