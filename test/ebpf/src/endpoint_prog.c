@@ -40,7 +40,7 @@ struct bpf_map_def map_policy_maps = {
 // declare ipCache map
 SEC("maps")
 struct bpf_map_def ip_cache_map = {
-    .type = BPF_MAP_TYPE_LPM_TRIE,
+    .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(ip_address_t),
     .value_size = sizeof(uint32_t),
     .max_entries = IP_CACHE_MAP_SIZE};

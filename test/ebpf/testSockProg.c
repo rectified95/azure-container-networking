@@ -126,20 +126,7 @@ struct npm_endpoint_prog_t test_ebpf_prog()
 
     _npm_endpoint_prog_t.recv4_accept_program = recv6_accept_program;
     printf("recv6 program\n");    
-    printf("Now getting MAP fds and pinning them\n");
-
-    struct bpf_map* comp_policy_map_obj = bpf_object__find_map_by_name(object, "compartment_policy_map");
-    if (comp_policy_map_obj == NULL) {
-        printf("comp policy map is null\n");
-        return _npm_endpoint_prog_t;
-    }
-
-    int err = pin_given_map(COMP_POLICY_MAP ,bpf_map__fd(comp_policy_map_obj));
-    if (err < 0) {
-        printf("Failed to pin COMP POLICY MAP\n");
-        return _npm_endpoint_prog_t;
-    }
-    printf("DONE pinning COMP POLICY MAP\n");    
+    printf("Now getting MAP fds and pinning them\n");   
 
     struct bpf_map* map_policy_maps_obj = bpf_object__find_map_by_name(object, "map_policy_maps");
     if (map_policy_maps_obj == NULL) {
@@ -147,7 +134,7 @@ struct npm_endpoint_prog_t test_ebpf_prog()
         return _npm_endpoint_prog_t;
     }
 
-    err = pin_given_map(GLOBAL_POLICY_MAP ,bpf_map__fd(map_policy_maps_obj));
+    int err = pin_given_map(GLOBAL_POLICY_MAP ,bpf_map__fd(map_policy_maps_obj));
     if (err < 0) {
         printf("Failed to pin GLOBAL POLICY MAP\n");
         return _npm_endpoint_prog_t;
@@ -166,6 +153,20 @@ struct npm_endpoint_prog_t test_ebpf_prog()
         return _npm_endpoint_prog_t;
     }
     printf("DONE pinning ip cache MAP\n");
+    /*
+    struct bpf_map* comp_policy_map_obj = bpf_object__find_map_by_name(object, "compartment_policy_map");
+    if (comp_policy_map_obj == NULL) {
+        printf("comp policy map is null\n");
+        return _npm_endpoint_prog_t;
+    }
+
+     err = pin_given_map(COMP_POLICY_MAP ,bpf_map__fd(comp_policy_map_obj));
+    if (err < 0) {
+        printf("Failed to pin COMP POLICY MAP\n");
+        return _npm_endpoint_prog_t;
+    }
+    printf("DONE pinning COMP POLICY MAP\n"); 
+    */
 
     return _npm_endpoint_prog_t;
 }
@@ -375,16 +376,15 @@ int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4, bool delete)
         return INVALID_MAP_FD;
     }
 
-    ip_address_t *ip_cache_key = {
-        ipv4,
-    };
+    ip_address_t ip_cache_key = {0};
+    ip_cache_key.ipv4 = ipv4;
 
     if (!delete)
     {
-        int result = bpf_map_update_elem(ip_cache_map_fd, &ip_cache_key, &ctx_label_id, BPF_ANY);
+        int result = bpf_map_update_elem(ip_cache_map_fd, &ip_cache_key, &ctx_label_id, 0);
         if (result != 0)
         {
-            printf("Error while updating ip cache map\n");
+            printf("Error while updating ip cache map %d\n", result);
             return result;
         }
     }

@@ -85,6 +85,7 @@ func test_scenario() int {
 		err := gupdate_ip_cache(id, tempip, false)
 		if err != 0 {
 			fmt.Println("Error: Could not add to ip cache")
+			return -1
 		}
 	}
 
