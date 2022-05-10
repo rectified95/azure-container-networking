@@ -211,41 +211,16 @@ int attach_progs(struct npm_endpoint_prog_t npm_ep)
     printf("Done attaching progs\n");
 }
 
-fd_t create_bpf_map(map_type_t internal_map_type)
+fd_t create_comp_bpf_map()
 {
     // struct _map_properties *map_props;
     printf("In create bpf map \n");
-    ebpf_map_type_t map_type = 0;
-    int key_size = 0;
-    int value_size = 0;
-    int max_entries = 0;
-
-    printf("internal map type %d\n", internal_map_type);
-    switch (internal_map_type)
-    {
-    case COMP_POLICY_MAP:
-        printf("in comp switch\n");
-        map_type = BPF_MAP_TYPE_HASH;
-        key_size = sizeof(policy_map_key_t);
-        value_size = sizeof(uint32_t);
-        max_entries = POLICY_MAP_SIZE;
-        
-        printf("after comp switch\n");
-        break;
-    case GLOBAL_POLICY_MAP:
-        map_type = BPF_MAP_TYPE_ARRAY_OF_MAPS;
-        key_size = sizeof(uint32_t);
-        value_size = sizeof(uint32_t);
-        max_entries = MAX_POD_SIZE;
-        break;
-    case IP_CACHE_MAP:
-        printf("in ipcache switch\n");
-        map_type = BPF_MAP_TYPE_HASH;
-        key_size = sizeof(ip_address_t);
-        value_size = sizeof(uint32_t);
-        max_entries = IP_CACHE_MAP_SIZE;
-        break;
-    }
+    ebpf_map_type_t map_type = BPF_MAP_TYPE_HASH;
+    int key_size = sizeof(policy_map_key_t);
+    int value_size = sizeof(uint32_t);
+    int max_entries = POLICY_MAP_SIZE;
+    
+    printf("after comp switch\n");
 
     printf("Just before creating the map\n");
     fd_t inner_map_fd =
@@ -273,10 +248,15 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
         return fd;
     }
 
-    printf("get_map_fd: pinned map not found, creating new map %s\n", map_name);
+    if (internal_map_type != COMP_POLICY_MAP) {
+        printf("Fatal: no map fd is found!");
+        return INVALID_MAP_FD;
+    }
+
+    printf("get_map_fd: pinned map not found, creating new comp policy map map %s\n", map_name);
 
     // Map not created yet. Create and pin the map.
-    fd = create_bpf_map(internal_map_type);
+    fd = create_comp_bpf_map();
     if (fd > 0)
     {
         // Map created. Now pin the map.
