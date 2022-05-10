@@ -240,7 +240,7 @@ fd_t create_bpf_map(map_type_t internal_map_type)
         break;
     case IP_CACHE_MAP:
         printf("in ipcache switch\n");
-        map_type = BPF_MAP_TYPE_LPM_TRIE;
+        map_type = BPF_MAP_TYPE_HASH;
         key_size = sizeof(ip_address_t);
         value_size = sizeof(uint32_t);
         max_entries = IP_CACHE_MAP_SIZE;
