@@ -24,7 +24,7 @@ char *get_epmap_name(int internal_map_type, int comp_id)
         int map_name_size = (sizeof(char) * strlen(COMP_PMAP_NAME_PREFIX)) + sizeof(int);
         char full_map_name[map_name_size];
         snprintf(&full_map_name, map_name_size, "%s%d", COMP_PMAP_NAME_PREFIX, comp_id);
-        return &full_map_name;
+        return full_map_name;
     }
     case GLOBAL_POLICY_MAP:
         return GLOBAL_PMAP_NAME;
@@ -288,7 +288,7 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
 
 int update_global_policy_map(int compartment_id)
 {
-    fd_t compartment_policy_map_fd = get_map_fd(COMP_POLICY_MAP, 0);
+    fd_t compartment_policy_map_fd = get_map_fd(COMP_POLICY_MAP,compartment_id);
     if (compartment_policy_map_fd == INVALID_MAP_FD)
     {
         return -1;
