@@ -21,11 +21,14 @@ void get_epmap_name(int internal_map_type, int comp_id, char **full_map_name)
     {
         int map_name_size = (sizeof(char) * strlen(COMP_PMAP_NAME_PREFIX)) + sizeof(int);
         snprintf(*full_map_name, map_name_size, "%s%d", COMP_PMAP_NAME_PREFIX, comp_id);
+        break;
     }
     case GLOBAL_POLICY_MAP:
         *full_map_name = GLOBAL_PMAP_NAME;
+        break;
     case IP_CACHE_MAP:
         *full_map_name = IP_CACHE_MAP_NAME;
+        break;
     }
 }
 
@@ -36,6 +39,7 @@ int pin_given_map(int internal_map_type, fd_t fd)
 
     // Map fd is invalid. Open fd to the map.
     char *pin_path = get_map_pin_path(map_name);
+    free(map_name);
     printf("pin_given_map: map pinned path %s\n", pin_path);
     fd_t fdnew = bpf_obj_get(pin_path);
     if (fdnew != INVALID_MAP_FD)
@@ -238,10 +242,12 @@ fd_t create_comp_bpf_map()
 
 fd_t get_map_fd(int internal_map_type, int compartment_id)
 {
-    char *map_name = get_epmap_name(internal_map_type, compartment_id);
+    char *map_name = NULL;
+    get_epmap_name(internal_map_type, compartment_id, &map_name);
 
     // Map fd is invalid. Open fd to the map.
     char *pin_path = get_map_pin_path(map_name);
+    free(map_name);
     printf("get_map_fd: map pinned path %s\n", pin_path);
     fd_t fd = bpf_obj_get(pin_path);
     if (fd != INVALID_MAP_FD)
