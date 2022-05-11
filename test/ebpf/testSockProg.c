@@ -20,9 +20,9 @@ void get_epmap_name(int internal_map_type, int comp_id, char **full_map_name)
     {
     case COMP_POLICY_MAP:
     {
-        const int prefixlen =  strlen(COMP_PMAP_NAME_PREFIX)+5;
+        const int prefixlen = strlen(COMP_PMAP_NAME_PREFIX) + 5;
         char numVal[prefixlen];
-        sprintf(numVal, "%s%d",COMP_PMAP_NAME_PREFIX, comp_id);
+        sprintf(numVal, "%s%d", COMP_PMAP_NAME_PREFIX, comp_id);
         *full_map_name = numVal;
         break;
     }
@@ -228,8 +228,6 @@ fd_t create_comp_bpf_map()
     int value_size = sizeof(uint32_t);
     int max_entries = POLICY_MAP_SIZE;
 
-    printf("after comp switch\n");
-
     printf("Just before creating the map\n");
     fd_t inner_map_fd =
         bpf_create_map(map_type, key_size, value_size, max_entries, 0);
@@ -239,6 +237,7 @@ fd_t create_comp_bpf_map()
         return INVALID_MAP_FD;
     }
 
+    printf("create_comp_bpf_map: Created the map\n");
     return inner_map_fd;
 }
 
@@ -277,16 +276,6 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
             // close map fd.
             _close(fd);
             return INVALID_MAP_FD;
-        }
-
-        if (internal_map_type == COMP_POLICY_MAP)
-        {
-            // Update the global map now
-            int result = update_global_policy_map((uint32_t)compartment_id);
-            if (result != 0)
-            {
-                return INVALID_MAP_FD;
-            }
         }
 
         return fd;
