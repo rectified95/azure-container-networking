@@ -20,9 +20,10 @@ void get_epmap_name(int internal_map_type, int comp_id, char **full_map_name)
     {
     case COMP_POLICY_MAP:
     {
-        const int prefixlen = strlen(COMP_PMAP_NAME_PREFIX) + 5;
-        char numVal[prefixlen];
-        sprintf(numVal, "%s%d", COMP_PMAP_NAME_PREFIX, comp_id);
+        int prefixlen =  strlen(COMP_PMAP_NAME_PREFIX)+5;
+        char *numVal;
+        numVal = (char*) malloc(prefixlen*sizeof(char));
+        sprintf(numVal, "%s%d",COMP_PMAP_NAME_PREFIX, comp_id);        
         *full_map_name = numVal;
         break;
     }
@@ -40,6 +41,7 @@ int pin_given_map(int internal_map_type, fd_t fd)
     char *map_name = NULL;
     get_epmap_name(internal_map_type, POLICY_MAP_ID, &map_name);
 
+    printf("pin_given_map: map name: %s\n", map_name);
     // Map fd is invalid. Open fd to the map.
     char *pin_path = get_map_pin_path(map_name);
     printf("pin_given_map: map pinned path %s\n", pin_path);
@@ -247,6 +249,7 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
     char *map_name = NULL;
     get_epmap_name(internal_map_type, compartment_id, &map_name);
 
+    printf("get_map_fd: map name: %s\n", map_name);
     // Map fd is invalid. Open fd to the map.
     char *pin_path = get_map_pin_path(map_name);
     printf("get_map_fd: map pinned path %s\n", pin_path);
@@ -286,7 +289,7 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
     return INVALID_MAP_FD;
 }
 
-int update_global_policy_map(uint32_t compartment_id)
+int update_global_policy_map(int compartment_id)
 {
     printf("In update_global_policy_map func\n");
     fd_t compartment_policy_map_fd = get_map_fd(COMP_POLICY_MAP, compartment_id);
