@@ -71,7 +71,8 @@ func test_scenario() int {
 	// "Name":  "35a1fa7e-eth0",
 	// "CompartmendId":  4,
 
-	compID := 4
+	var compID uint32
+	compID = 4
 
 	iptoid := map[string]uint32{
 		"10.240.0.16": 123,
@@ -89,7 +90,7 @@ func test_scenario() int {
 		}
 	}
 
-	retCode := C.update_global_policy_map(C.int(compID))
+	retCode := C.update_global_policy_map(C.uint32_t(compID))
 	if retCode < 0 {
 		fmt.Println("Error: Could not get comp map fd")
 		return -1

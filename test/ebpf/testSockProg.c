@@ -15,12 +15,15 @@ char *get_map_pin_path(const char *map_name)
 
 void get_epmap_name(int internal_map_type, int comp_id, char **full_map_name)
 {
+    printf("in get_epmap_name func\n");
     switch (internal_map_type)
     {
     case COMP_POLICY_MAP:
     {
-        int map_name_size = (sizeof(char) * strlen(COMP_PMAP_NAME_PREFIX)) + sizeof(int);
-        snprintf(*full_map_name, map_name_size, "%s%d", COMP_PMAP_NAME_PREFIX, comp_id);
+        const int prefixlen =  strlen(COMP_PMAP_NAME_PREFIX)+5;
+        char numVal[prefixlen];
+        sprintf(numVal, "%s%d",COMP_PMAP_NAME_PREFIX, comp_id);
+        *full_map_name = numVal;
         break;
     }
     case GLOBAL_POLICY_MAP:
@@ -39,7 +42,6 @@ int pin_given_map(int internal_map_type, fd_t fd)
 
     // Map fd is invalid. Open fd to the map.
     char *pin_path = get_map_pin_path(map_name);
-    free(map_name);
     printf("pin_given_map: map pinned path %s\n", pin_path);
     fd_t fdnew = bpf_obj_get(pin_path);
     if (fdnew != INVALID_MAP_FD)
@@ -242,12 +244,12 @@ fd_t create_comp_bpf_map()
 
 fd_t get_map_fd(int internal_map_type, int compartment_id)
 {
+    printf("in get_map_fd func\n");
     char *map_name = NULL;
     get_epmap_name(internal_map_type, compartment_id, &map_name);
 
     // Map fd is invalid. Open fd to the map.
     char *pin_path = get_map_pin_path(map_name);
-    free(map_name);
     printf("get_map_fd: map pinned path %s\n", pin_path);
     fd_t fd = bpf_obj_get(pin_path);
     if (fd != INVALID_MAP_FD)
@@ -280,7 +282,7 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
         if (internal_map_type == COMP_POLICY_MAP)
         {
             // Update the global map now
-            int result = update_global_policy_map(compartment_id);
+            int result = update_global_policy_map((uint32_t)compartment_id);
             if (result != 0)
             {
                 return INVALID_MAP_FD;
@@ -295,8 +297,9 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
     return INVALID_MAP_FD;
 }
 
-int update_global_policy_map(int compartment_id)
+int update_global_policy_map(uint32_t compartment_id)
 {
+    printf("In update_global_policy_map func\n");
     fd_t compartment_policy_map_fd = get_map_fd(COMP_POLICY_MAP, compartment_id);
     if (compartment_policy_map_fd == INVALID_MAP_FD)
     {
@@ -317,6 +320,7 @@ int update_global_policy_map(int compartment_id)
         printf("Error while updating global policy map\n");
         return error;
     }
+    return 0;
 }
 
 int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint16_t remote_port, int compartment_id, int policy_id, bool delete)
