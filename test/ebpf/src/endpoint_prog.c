@@ -57,7 +57,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         bpf_printk("Policy Eval: No policy map for compartment");
         // if there is no policy map attached to this compartment
         // then no policy is applied, allow all traffic.
-        return CGROUP_ACT_OK;
+        return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
 
     // Look up L4 first
@@ -67,7 +67,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         // char msg[128];
         bpf_printk("Policy Eval: L4 policy ID %lu Allowed.", *verdict);
         // bpf_printk(msg);
-        return CGROUP_ACT_OK;
+        return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
 
     // Look up L3 rules
@@ -78,10 +78,10 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         // char msg[128];
         bpf_printk("Policy Eval: L3 policy ID %lu Allowed.", *verdict);
         // bpf_printk(msg);
-        return CGROUP_ACT_OK;
+        return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
 
-    return CGROUP_ACT_REJECT;
+    return BPF_SOCK_ADDR_VERDICT_REJECT;
 }
 
 __inline int
@@ -102,7 +102,7 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         bpf_printk("Policy Eval: No policy map for compartment");
         // if there is no policy map attached to this compartment
         // then no policy is applied, allow all traffic.
-        return CGROUP_ACT_OK;
+        return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
     */
 
@@ -113,7 +113,7 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         bpf_printk("No label found for IP, dropping packet.");
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
-        return CGROUP_ACT_REJECT;
+        return BPF_SOCK_ADDR_VERDICT_REJECT;
     }
 
     policy_map_key_t key = {0};
@@ -143,7 +143,7 @@ authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
         bpf_printk("Policy Eval: No policy map for compartment");
         // if there is no policy map attached to this compartment
         // then no policy is applied, allow all traffic.
-        return CGROUP_ACT_OK;
+        return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
     */
 
@@ -154,7 +154,7 @@ authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
         bpf_printk("No label found for IP, dropping packet.");
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
-        return CGROUP_ACT_REJECT;
+        return BPF_SOCK_ADDR_VERDICT_REJECT;
     }
 
     policy_map_key_t key = {0};

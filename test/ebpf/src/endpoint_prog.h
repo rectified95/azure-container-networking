@@ -11,9 +11,6 @@ typedef enum direction
     EGRESS,
 } direction_t;
 
-#define CGROUP_ACT_OK 0
-#define CGROUP_ACT_REJECT 1
-
 typedef struct policy_map_key
 {
     uint32_t remote_pod_label_id;

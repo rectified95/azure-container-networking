@@ -99,7 +99,10 @@ func test_scenario() int {
 	fmt.Println("All traffic should be dropped here")
 	fmt.Println("Sleeping now")
 
-	time.Sleep(15 * time.Minute)
+	for i := 0; i <= 15; i++ {
+		time.Sleep(1 * time.Minute)
+		fmt.Println("Sleeping at %d min", i)
+	}
 	return 0
 }
 
