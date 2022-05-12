@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"time"
 )
 
 type direction int
@@ -96,6 +97,9 @@ func test_scenario() int {
 	}
 
 	fmt.Println("All traffic should be dropped here")
+	fmt.Println("Sleeping now")
+
+	time.Sleep(15 * time.Minute)
 	return 0
 }
 
