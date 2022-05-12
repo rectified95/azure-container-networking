@@ -223,7 +223,7 @@ int attach_progs(struct npm_endpoint_prog_t npm_ep)
 
 int attach_progs_to_compartment(struct npm_endpoint_prog_t npm_ep, int compartment_id)
 {
-    printf("attaching progs to compartment %d\n", )compartment_id;
+    printf("attaching progs to compartment %d\n",compartment_id);
     printf("attach V4 connect prog\n");
     // attach V4 connect prog
     int result = bpf_prog_attach(bpf_program__fd(npm_ep.connect4_program), compartment_id, BPF_CGROUP_INET4_CONNECT, 0);

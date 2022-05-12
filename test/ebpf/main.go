@@ -38,7 +38,7 @@ func NewWinEbfState(epprog C.struct_npm_endpoint_prog_t) *WinEbpfState {
 }
 
 func main() {
-	winState , res := initialize()
+	winState, res := initialize()
 	if res == RET_ERR {
 		fmt.Println("Error: Could not initialize sockprog")
 		return
@@ -46,8 +46,6 @@ func main() {
 	if winState == nil {
 		fmt.Println("Failed to initialize WinEbpfState")
 	}
-
-
 
 	// 85-testing cluster
 	// block all traffic on pod with IP 10.240.0.37
@@ -58,20 +56,23 @@ func main() {
 
 	compID := 4
 
-	res := C.attach_progs_to_compartment(winState.epprog, compID)
-	if res < 0 {
-		return RET_ERR
+	reErr := C.attach_progs_to_compartment(winState.epprog, C.int(compID))
+	if reErr < 0 {
+		fmt.Println("Failed while attaching prog to compartment")
+		return
 	}
 
 	fmt.Println("running our scenario")
 	res1 := test_scenario(compID)
 	if res1 < 0 {
-		return RET_ERR
+
+		fmt.Println("Failed while running scenario")
+		return
 	}
 
 }
 
-func initialize() ( *WinEbpfState, int){
+func initialize() (*WinEbpfState, int) {
 	fmt.Println("init")
 	r := (C.struct_npm_endpoint_prog_t)(C.test_ebpf_prog())
 
@@ -90,7 +91,7 @@ func initialize() ( *WinEbpfState, int){
 	return state, 0
 }
 
-func test_scenario(compID int ) int {
+func test_scenario(compID int) int {
 
 	iptoid := map[string]uint32{
 		"10.240.0.16": 123,
