@@ -221,6 +221,46 @@ int attach_progs(struct npm_endpoint_prog_t npm_ep)
     printf("Done attaching progs\n");
 }
 
+int attach_progs_to_compartment(struct npm_endpoint_prog_t npm_ep, int compartment_id)
+{
+    printf("attaching progs\n");
+    printf("attach V4 connect prog\n");
+    // attach V4 connect prog
+    int result = bpf_prog_attach(bpf_program__fd(npm_ep.connect4_program), compartment_id, BPF_CGROUP_INET4_CONNECT, 0);
+    if (result != 0)
+    {
+        printf("Error is null while attaching v4 connect prog\n");
+        return result;
+    }
+    printf("attach V6 connect prog\n");
+    // attach V6 connect prog
+    bpf_prog_attach(bpf_program__fd(npm_ep.connect6_program), compartment_id, BPF_CGROUP_INET6_CONNECT, 0);
+    if (result != 0)
+    {
+        printf("Error while attaching v6 connect prog\n");
+        return result;
+    }
+    printf("attach V4 recv prog\n");
+    // attach V4 recv prog
+    bpf_prog_attach(bpf_program__fd(npm_ep.recv4_accept_program), compartment_id, BPF_CGROUP_INET4_RECV_ACCEPT, 0);
+    if (result != 0)
+    {
+        printf("Error is null while attaching v4 recv prog\n");
+        return result;
+    }
+    printf("attach V6 recv prog\n");
+    // attach V6 recv prog
+
+    bpf_prog_attach(bpf_program__fd(npm_ep.recv6_accept_program), compartment_id, BPF_CGROUP_INET6_RECV_ACCEPT, 0);
+    if (result != 0)
+    {
+        printf("Error is null while attaching v6 recv prog\n");
+        return result;
+    }
+
+    printf("Done attaching progs\n");
+}
+
 fd_t create_comp_bpf_map()
 {
     // struct _map_properties *map_props;

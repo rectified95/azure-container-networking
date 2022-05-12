@@ -42,6 +42,7 @@ typedef struct ip_address
 
 struct npm_endpoint_prog_t test_ebpf_prog();
 int attach_progs(struct npm_endpoint_prog_t npm_ep);
+int attach_progs_to_compartment(struct npm_endpoint_prog_t npm_ep, int compartment_id);
 int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint16_t remote_port, int compartment_id, int policy_id, bool delete);
 int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4, bool delete);
 int update_global_policy_map(int compartment_id);

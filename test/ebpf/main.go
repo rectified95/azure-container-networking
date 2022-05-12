@@ -26,6 +26,17 @@ const (
 	EGRESS  direction = 1
 )
 
+type WinEbpfState struct {
+	epprog      C.struct_npm_endpoint_prog_t
+	podMetadata map[string]int
+}
+
+func NewWinEbfState(epprog C.struct_npm_endpoint_prog_t) *WinEbpfState {
+	return &WinEbpfState{
+		epprog: epprog,
+	}
+}
+
 func main() {
 	res := initialize()
 	if res == RET_ERR {
