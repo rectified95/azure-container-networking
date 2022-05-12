@@ -38,44 +38,17 @@ func NewWinEbfState(epprog C.struct_npm_endpoint_prog_t) *WinEbpfState {
 }
 
 func main() {
-	res := initialize()
+	winState , res := initialize()
 	if res == RET_ERR {
 		fmt.Println("Error: Could not initialize sockprog")
 		return
 	}
-
-}
-
-func initialize() int {
-	fmt.Println("init")
-	r := (C.struct_npm_endpoint_prog_t)(C.test_ebpf_prog())
-
-	if (r == C.struct_npm_endpoint_prog_t{}) {
-		fmt.Print("failed to load")
-		return RET_ERR
+	if winState == nil {
+		fmt.Println("Failed to initialize WinEbpfState")
 	}
 
-	fmt.Println("%+v", r.connect4_program)
 
-	fmt.Print("Done loading progs")
-	fmt.Println(r)
 
-	res := C.attach_progs(r)
-
-	if res < 0 {
-		return RET_ERR
-	}
-
-	fmt.Println("running our scenario")
-	res1 := test_scenario()
-	if res1 < 0 {
-		return RET_ERR
-	}
-
-	return 0
-}
-
-func test_scenario() int {
 	// 85-testing cluster
 	// block all traffic on pod with IP 10.240.0.37
 	// which is win-webserver-7b7d755975-hxswl with
@@ -84,6 +57,40 @@ func test_scenario() int {
 	// "CompartmendId":  4,
 
 	compID := 4
+
+	res := C.attach_progs_to_compartment(winState.epprog, compID)
+	if res < 0 {
+		return RET_ERR
+	}
+
+	fmt.Println("running our scenario")
+	res1 := test_scenario(compID)
+	if res1 < 0 {
+		return RET_ERR
+	}
+
+}
+
+func initialize() ( *WinEbpfState, int){
+	fmt.Println("init")
+	r := (C.struct_npm_endpoint_prog_t)(C.test_ebpf_prog())
+
+	if (r == C.struct_npm_endpoint_prog_t{}) {
+		fmt.Print("failed to load")
+		return nil, RET_ERR
+	}
+
+	fmt.Println("%+v", r.connect4_program)
+
+	fmt.Print("Done loading progs")
+	fmt.Println(r)
+
+	state := NewWinEbfState(r)
+
+	return state, 0
+}
+
+func test_scenario(compID int ) int {
 
 	iptoid := map[string]uint32{
 		"10.240.0.16": 123,
