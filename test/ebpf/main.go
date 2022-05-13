@@ -48,13 +48,10 @@ func main() {
 	}
 
 	// 85-testing cluster
-	// block all traffic on pod with IP 10.240.0.37
-	// which is win-webserver-7b7d755975-hxswl with
-	// "ID":  "2e931103-8088-4873-b0fa-f5f8adc13c3b",
-	// "Name":  "35a1fa7e-eth0",
-	// "CompartmendId":  4,
+	// block all traffic on pod with IP 10.240.0.47
+	// "CompartmendId":  3,
 
-	compID := 4
+	compID := 3
 
 	reErr := C.attach_progs_to_compartment(winState.epprog, C.int(compID))
 	if reErr < 0 {
