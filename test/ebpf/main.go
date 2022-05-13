@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"net"
 	"time"
+
+	"github.com/Azure/azure-container-networking/common"
 )
 
 type direction int
@@ -21,9 +23,10 @@ const (
 )
 
 const (
-	RET_ERR int       = -1
-	INGRESS direction = 0
-	EGRESS  direction = 1
+	RET_ERR          int       = -1
+	INGRESS          direction = 0
+	EGRESS           direction = 1
+	AzureNetworkName           = "azure"
 )
 
 type WinEbpfState struct {
@@ -38,6 +41,23 @@ func NewWinEbfState(epprog C.struct_npm_endpoint_prog_t) *WinEbpfState {
 }
 
 func main() {
+
+	ioShim := common.NewIOShim()
+
+	network, err := ioShim.Hns.GetNetworkByName(AzureNetworkName)
+	if err != nil {
+		fmt.Println("Error: Could not get network, %s", err)
+		return
+	}
+
+	endpoints, err := ioShim.Hns.ListEndpointsOfNetwork(network.Id)
+	if err != nil {
+		fmt.Println("Error: Could not get endpoints, %s", err)
+		return
+	}
+
+	fmt.Println(endpoints)
+
 	winState, res := initialize()
 	if res == RET_ERR {
 		fmt.Println("Error: Could not initialize sockprog")

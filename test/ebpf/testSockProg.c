@@ -8,6 +8,10 @@
 char *get_map_pin_path(const char *map_name)
 {
     char *map_pin_path = malloc(sizeof(char) * (strlen(map_name) + strlen(DEFAULT_MAP_PIN_PATH_PREFIX) + 1));
+    if (map_pin_path == NULL)
+    {
+        return NULL;
+    }
     strcpy(map_pin_path, DEFAULT_MAP_PIN_PATH_PREFIX);
     strcat(map_pin_path, map_name);
     return map_pin_path;
@@ -20,10 +24,15 @@ void get_epmap_name(int internal_map_type, int comp_id, char **full_map_name)
     {
     case COMP_POLICY_MAP:
     {
-        int prefixlen =  strlen(COMP_PMAP_NAME_PREFIX)+5;
+        int prefixlen = strlen(COMP_PMAP_NAME_PREFIX) + 5;
         char *numVal;
-        numVal = (char*) malloc(prefixlen*sizeof(char));
-        sprintf(numVal, "%s%d",COMP_PMAP_NAME_PREFIX, comp_id);        
+        numVal = (char *)malloc(prefixlen * sizeof(char));
+        if (numVal == NULL)
+        {
+            printf("malloc failed\n");
+            return;
+        }
+        sprintf(numVal, "%s%d", COMP_PMAP_NAME_PREFIX, comp_id);
         *full_map_name = numVal;
         break;
     }
@@ -40,10 +49,18 @@ int pin_given_map(int internal_map_type, fd_t fd)
 {
     char *map_name = NULL;
     get_epmap_name(internal_map_type, POLICY_MAP_ID, &map_name);
+    if (map_name == NULL)
+    {
+        return -1;
+    }
 
     printf("pin_given_map: map name: %s\n", map_name);
     // Map fd is invalid. Open fd to the map.
     char *pin_path = get_map_pin_path(map_name);
+    if (pin_path == NULL)
+    {
+        return -1;
+    }
     printf("pin_given_map: map pinned path %s\n", pin_path);
     fd_t fdnew = bpf_obj_get(pin_path);
     if (fdnew != INVALID_MAP_FD)
@@ -130,7 +147,7 @@ struct npm_endpoint_prog_t test_ebpf_prog()
         return _npm_endpoint_prog_t;
     }
 
-    _npm_endpoint_prog_t.recv4_accept_program = recv6_accept_program;
+    _npm_endpoint_prog_t.recv6_accept_program = recv6_accept_program;
     printf("recv6 program\n");
     printf("Now getting MAP fds and pinning them\n");
 
@@ -163,20 +180,6 @@ struct npm_endpoint_prog_t test_ebpf_prog()
         return _npm_endpoint_prog_t;
     }
     printf("DONE pinning ip cache MAP\n");
-    /*
-    struct bpf_map* comp_policy_map_obj = bpf_object__find_map_by_name(object, "compartment_policy_map");
-    if (comp_policy_map_obj == NULL) {
-        printf("comp policy map is null\n");
-        return _npm_endpoint_prog_t;
-    }
-
-     err = pin_given_map(COMP_POLICY_MAP ,bpf_map__fd(comp_policy_map_obj));
-    if (err < 0) {
-        printf("Failed to pin COMP POLICY MAP\n");
-        return _npm_endpoint_prog_t;
-    }
-    printf("DONE pinning COMP POLICY MAP\n");
-    */
 
     return _npm_endpoint_prog_t;
 }
@@ -223,7 +226,7 @@ int attach_progs(struct npm_endpoint_prog_t npm_ep)
 
 int attach_progs_to_compartment(struct npm_endpoint_prog_t npm_ep, int compartment_id)
 {
-    printf("attaching progs to compartment %d\n",compartment_id);
+    printf("attaching progs to compartment %d\n", compartment_id);
     printf("attach V4 connect prog\n");
     // attach V4 connect prog
     int result = bpf_prog_attach(bpf_program__fd(npm_ep.connect4_program), compartment_id, BPF_CGROUP_INET4_CONNECT, 0);
@@ -288,10 +291,20 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
     printf("in get_map_fd func\n");
     char *map_name = NULL;
     get_epmap_name(internal_map_type, compartment_id, &map_name);
+    if (map_name == NULL)
+    {
+        printf("map name is null\n");
+        return INVALID_MAP_FD;
+    }
 
     printf("get_map_fd: map name: %s\n", map_name);
     // Map fd is invalid. Open fd to the map.
     char *pin_path = get_map_pin_path(map_name);
+    if (pin_path == NULL)
+    {
+        printf("get_map_fd: pin path is null\n");
+        return INVALID_MAP_FD;
+    }
     printf("get_map_fd: map pinned path %s\n", pin_path);
     fd_t fd = bpf_obj_get(pin_path);
     if (fd != INVALID_MAP_FD)
@@ -316,8 +329,6 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
         int error = bpf_obj_pin(fd, pin_path);
         if (error != 0)
         {
-            // close map fd.
-            _close(fd);
             return INVALID_MAP_FD;
         }
 

@@ -4,21 +4,6 @@
 #include "bpf_helpers.h"
 #include "endpoint_prog.h"
 
-/*
-this below map definition is from test/ebpf/src/cgroup_sock_addr.c
-and is failing at size
-
-.\endpoint_prog.c:21:6: error: field designator 'size' does not refer to any field in type 'ebpf_map_definition_in_file_t' (aka 'struct _ebpf_map_definition_in_file')
-    .size = sizeof(ebpf_map_definition_in_file_t),
-
-ebpf_map_definition_in_file_t ip_cache_map = {
-    .size = sizeof(ebpf_map_definition_in_file_t),
-    .type = BPF_MAP_TYPE_LPM_TRIE,
-    .key_size = sizeof(ip_address_t),
-    .value_size = sizeof(uint32_t),
-    .max_entries = IP_CACHE_MAP_SIZE};
-*/
-
 // define the policy map
 SEC("maps")
 struct bpf_map_def compartment_policy_map = {
@@ -33,9 +18,9 @@ SEC("maps")
 struct bpf_map_def map_policy_maps = {
     .type = BPF_MAP_TYPE_ARRAY_OF_MAPS,
     .key_size = sizeof(uint32_t),   // key is a compartment ID
-    .value_size = sizeof(uint32_t), // value is FD of the policy map specific to that compartment
+    .value_size = sizeof(uint32_t), // value is ID of the policy map specific to that compartment
     .max_entries = MAX_POD_SIZE,    // max number of pods in test cluster
-    .inner_id = POLICY_MAP_ID};     ///< id of policy_map in the ELF file
+    .inner_id = POLICY_MAP_ID};     // id of policy_map in the ELF file
 
 // declare ipCache map
 SEC("maps")
@@ -94,17 +79,17 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         ip_to_lookup.ipv4 = ctx->user_ip4;
     }
 
-/*
-    uint32_t comp_id =  ctx->compartment_id;
-    int32_t *policy_map_fd =  (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &comp_id);
-    if (policy_map_fd == NULL)
-    {
-        bpf_printk("Policy Eval: No policy map for compartment");
-        // if there is no policy map attached to this compartment
-        // then no policy is applied, allow all traffic.
-        return BPF_SOCK_ADDR_VERDICT_PROCEED;
-    }
-    */
+    /*
+        uint32_t comp_id =  ctx->compartment_id;
+        int32_t *policy_map_fd =  (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &comp_id);
+        if (policy_map_fd == NULL)
+        {
+            bpf_printk("Policy Eval: No policy map for compartment");
+            // if there is no policy map attached to this compartment
+            // then no policy is applied, allow all traffic.
+            return BPF_SOCK_ADDR_VERDICT_PROCEED;
+        }
+        */
 
     uint32_t *ctx_label_id = NULL;
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
@@ -136,7 +121,7 @@ authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
     }
 
     /* with this below check for some reason verification fails.
-    
+
     int32_t *policy_map_fd =  (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &ctx->compartment_id);
     if (policy_map_fd == NULL)
     {
