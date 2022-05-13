@@ -74,8 +74,6 @@ int pin_given_map(int internal_map_type, fd_t fd)
     int error = bpf_obj_pin(fd, pin_path);
     if (error != 0)
     {
-        // close map fd.
-        _close(fd);
         return -1;
     }
     return 0;
