@@ -55,6 +55,7 @@ func newStartNPMCmd() *cobra.Command {
 
 			flags := npmconfig.Flags{
 				KubeConfigPath: viper.GetString(flagKubeConfigPath),
+				WinEbpf: viper.GetString(flagWinWbpf),
 			}
 
 			return start(*config, flags)
@@ -62,6 +63,7 @@ func newStartNPMCmd() *cobra.Command {
 	}
 
 	startNPMCmd.Flags().String(flagKubeConfigPath, flagDefaults[flagKubeConfigPath], "path to kubeconfig")
+	startNPMCmd.Flags().String(flagWinWbpf, flagDefaults[flagWinWbpf], "if windows ebpf")
 
 	return startNPMCmd
 }
