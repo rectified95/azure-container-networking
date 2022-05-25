@@ -1,4 +1,4 @@
-package main
+package ebpf
 
 /*
 #include <stdlib.h>
