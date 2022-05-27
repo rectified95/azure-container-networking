@@ -34,6 +34,18 @@ func (dp *EBPF_DP) InitializeBPF() int {
 	return 0
 }
 
+func (dp *EBPF_DP) InsertPodID(id int, ip string) int {
+	fmt.Println("Adding to IPcache %s, %s", ip, id)
+	tempip := net.ParseIP(ip)
+	delete := false
+	res := C.update_ip_cache4(C.uint32_t(remote_label_id), C.uint32_t(convertip2int(ip)), C.bool(delete))
+	if res < 0 {
+		fmt.Println("Error: Could not update ip cache")
+		return RET_ERR
+	}
+	return 0
+}
+
 func (dp *EBPF_DP) GetIDs() map[string]int {
 	return map[string]int{
 		"x:a": 150,
@@ -47,4 +59,12 @@ func (dp *EBPF_DP) GetIDs() map[string]int {
 		"z:c": 172,
 		"any": 200,
 	}
+}
+
+
+func convertip2int(ip net.IP) uint32 {
+	if len(ip) == 16 {
+		return binary.BigEndian.Uint32(ip[12:16])
+	}
+	return binary.BigEndian.Uint32(ip)
 }
