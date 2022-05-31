@@ -399,7 +399,7 @@ func (c *PodController) syncAddedPod(podObj *corev1.Pod) error {
 	// Get lists of podLabelKey and podLabelKey + podLavelValue ,and then start adding them to ipsets.
 	for labelKey, labelVal := range podObj.Labels {
 		npmPodObj.appendLabels(map[string]string{labelKey: labelVal}, appendToExistingLabels)
-		if labelKey == "pod" {
+		if labelKey == "role" {
 			labelValue = labelVal
 			break
 		}
