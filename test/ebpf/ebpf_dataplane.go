@@ -98,6 +98,21 @@ func getFrontEndPolicyObj() {
 		direction: OUT
 	}, 1 (policy ID),
 	Key= {
+		remote_port: 53,
+		remote_pod_label_id: 180,
+		direction: OUT
+	}, 1 (policy ID),
+	Key= {
+		remote_port: 53,
+		remote_pod_label_id: 181,
+		direction: OUT
+	}, 1 (policy ID),
+	Key= {
+		remote_port: 53,
+		remote_pod_label_id: 182,
+		direction: OUT
+	}, 1 (policy ID),
+	Key= {
 		remote_port: 0,
 		remote_pod_label_id: 180,
 		direction: OUT
@@ -182,6 +197,21 @@ spec:
 		remote_pod_label_id: 200,
 		direction: OUT
 	}, 2 (policy ID),
+	Key= {
+		remote_port: 53,
+		remote_pod_label_id: 180,
+		direction: OUT
+	}, 1 (policy ID),
+	Key= {
+		remote_port: 53,
+		remote_pod_label_id: 181,
+		direction: OUT
+	}, 1 (policy ID),
+	Key= {
+		remote_port: 53,
+		remote_pod_label_id: 182,
+		direction: OUT
+	}, 1 (policy ID),
 	Key= {
 		remote_port: 0,
 		remote_pod_label_id: 180,
