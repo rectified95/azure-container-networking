@@ -88,6 +88,7 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     struct npm_endpoint_prog_t _npm_endpoint_prog_t;
     struct bpf_object *object;
     int program_fd;
+    //int result = bpf_prog_load("src/endpoint_prog.o", BPF_PROG_TYPE_CGROUP_SOCK_ADDR, &object, &program_fd);
     int result = bpf_prog_load("src/endpoint_prog.o", BPF_PROG_TYPE_CGROUP_SOCK_ADDR, &object, &program_fd);
 
     if (!object)
