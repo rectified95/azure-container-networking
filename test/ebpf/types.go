@@ -1,1 +1,1 @@
-package ebpf
+package main

@@ -1,4 +1,4 @@
-package ebpf
+package main
 
 /*
 #include <stdlib.h>
@@ -6,7 +6,9 @@ package ebpf
 */
 import "C"
 import (
+	"encoding/binary"
 	"fmt"
+	"net"
 )
 
 type EBPF_DP struct {
@@ -34,9 +36,10 @@ func (dp *EBPF_DP) InitializeBPF() int {
 	return 0
 }
 
+/* commented out by matmerr, maybe needed?
 func (dp *EBPF_DP) InsertPodID(id int, ip string) int {
 	fmt.Println("Adding to IPcache %s, %s", ip, id)
-	tempip := net.ParseIP(ip)
+	//tempip := net.ParseIP(ip)
 	delete := false
 	res := C.update_ip_cache4(C.uint32_t(remote_label_id), C.uint32_t(convertip2int(ip)), C.bool(delete))
 	if res < 0 {
@@ -45,25 +48,25 @@ func (dp *EBPF_DP) InsertPodID(id int, ip string) int {
 	}
 	return 0
 }
+*/
 
 func (dp *EBPF_DP) GetIDs() map[string]int {
 	return map[string]int{
-		"x:a": 150,
-		"x:b": 151,
-		"x:c": 152,
-		"y:a": 160,
-		"y:b": 161,
-		"y:c": 162,
-		"z:a": 170,
-		"z:b": 171,
-		"z:c": 172,
+		"x:a":              150,
+		"x:b":              151,
+		"x:c":              152,
+		"y:a":              160,
+		"y:b":              161,
+		"y:c":              162,
+		"z:a":              170,
+		"z:b":              171,
+		"z:c":              172,
 		"default:frontend": 180,
-		"default:backend": 181,
+		"default:backend":  181,
 		"default:database": 182,
-		"any": 200,
+		"any":              200,
 	}
 }
-
 
 func convertip2int(ip net.IP) uint32 {
 	if len(ip) == 16 {
@@ -72,7 +75,11 @@ func convertip2int(ip net.IP) uint32 {
 	return binary.BigEndian.Uint32(ip)
 }
 
+/*
 func getFrontEndPolicyObj() {
+	endpointPolicy := []C.struct_
+	return
+
 	```typedef struct policy_map_key
 	{
 		uint32_t remote_pod_label_id;
@@ -82,7 +89,7 @@ func getFrontEndPolicyObj() {
 	} policy_map_key_t;
 
 
-	Podselector: role:frontend 
+	Podselector: role:frontend
 
 
 	Policy Map of this role:frontend:
@@ -182,7 +189,7 @@ spec:
     - podSelector: {}
 
 
-	Podselector: role:backend 
+	Podselector: role:backend
 
 
 	Policy Map of this role:backend:
@@ -246,7 +253,7 @@ spec:
 
 
 
-  Podselector: role:database 
+  Podselector: role:database
 
 
   Policy Map of this role:database:
@@ -259,3 +266,4 @@ spec:
 
 
 ```
+*/
