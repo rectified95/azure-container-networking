@@ -94,16 +94,16 @@ func getFrontEndPolicyObj() {
 
 	Policy Map of this role:frontend:
 
-	Key= {
-		remote_port: 443,
-		remote_pod_label_id: 200,
-		direction: IN
-	}, 1 (policy ID),
-	Key= {
-		remote_port: 53,
-		remote_pod_label_id: 200,
-		direction: OUT
-	}, 1 (policy ID),
+		Key= {
+			remote_port: 443,
+			remote_pod_label_id: 200,
+			direction: IN
+		}, 1 (policy ID),
+		Key= {
+			remote_port: 53,
+			remote_pod_label_id: 200,
+			direction: OUT
+		}, 1 (policy ID),
 	Key= {
 		remote_port: 53,
 		remote_pod_label_id: 180,
@@ -124,11 +124,11 @@ func getFrontEndPolicyObj() {
 		remote_pod_label_id: 180,
 		direction: OUT
 	}, 1 (policy ID),
-	Key= {
-		remote_port: 0,
-		remote_pod_label_id: 181,
-		direction: OUT
-	}, 1 (policy ID),
+		Key= {
+			remote_port: 0,
+			remote_pod_label_id: 181,
+			direction: OUT
+		}, 1 (policy ID),
 	Key= {
 		remote_port: 0,
 		remote_pod_label_id: 182,
@@ -208,17 +208,17 @@ spec:
 		remote_port: 53,
 		remote_pod_label_id: 180,
 		direction: OUT
-	}, 1 (policy ID),
+	}, 2 (policy ID),
 	Key= {
 		remote_port: 53,
 		remote_pod_label_id: 181,
 		direction: OUT
-	}, 1 (policy ID),
+	}, 2 (policy ID),
 	Key= {
 		remote_port: 53,
 		remote_pod_label_id: 182,
 		direction: OUT
-	}, 1 (policy ID),
+	}, 2 (policy ID),
 	Key= {
 		remote_port: 0,
 		remote_pod_label_id: 180,

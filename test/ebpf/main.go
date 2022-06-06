@@ -78,7 +78,6 @@ func main() {
 		fmt.Println("Failed while attaching prog to compartment")
 		return
 	}
-	//test_scenarioFrontendPolicy()
 
 	fmt.Println("running our scenario")
 	res1 := test_scenario(compID)
@@ -133,6 +132,22 @@ func test_scenario(compID int) int {
 		return -1
 	}
 
+	// manually creating frotendpolicy id to 700
+	// say compID is the frontend pod
+
+	// here we have compartment ID
+	gupdate_comp_policy_map(200, 443, 700, compID, INGRESS, false)
+	gupdate_comp_policy_map(200, 53, 700, compID, EGRESS, false)
+	gupdate_comp_policy_map(181, 0, 700, compID, EGRESS, false)
+
+	// backend compid is 4
+	backendcompid := 4
+	gupdate_comp_policy_map(180, 0, 700, backendcompid, EGRESS, false)
+
+	// need compartment policy map
+	// create if doesn't exist policy map corresponding to frontendpolicy
+	// add keys and action to policy map
+
 	fmt.Println("All traffic should be dropped here")
 	fmt.Println("Sleeping now")
 
@@ -141,17 +156,6 @@ func test_scenario(compID int) int {
 		fmt.Println("Sleeping at %d min", i)
 	}
 	return 0
-}
-
-func test_scenarioFrontendPolicy() {
-	policies := []C.struct_policy_map_key{
-		{
-			remote_pod_label_id: C.uint(200),
-			remote_port:         C.ushort(443),
-			direction:           C.uchar(INGRESS),
-		},
-	}
-	fmt.Println(policies)
 }
 
 func gupdate_comp_policy_map(remote_label_id, remote_port, policy_id, compartment_id int, dir direction, delete bool) int {
