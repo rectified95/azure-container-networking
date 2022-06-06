@@ -71,17 +71,28 @@ func main() {
 	// block all traffic on pod with IP 10.240.0.47
 	// "CompartmendId":  3,
 
-	compID := 3
+	// frontend compid is 3
+	// backend compid is 8
+	// database compid is 4
 
-	reErr := C.attach_progs_to_compartment(winState.epprog, C.int(compID))
+	frontendID := 3
+	backendID := 8
+
+	// attach to frontend endpoint id
+	reErr := C.attach_progs_to_compartment(winState.epprog, C.int(frontendID))
 	if reErr < 0 {
-		fmt.Println("Failed while attaching prog to compartment")
+		fmt.Println("Failed while attaching prog to compartment %v with err %v", frontendID, reErr)
 		return
 	}
-	//test_scenarioFrontendPolicy()
+
+	reErr = C.attach_progs_to_compartment(winState.epprog, C.int(backendID))
+	if reErr < 0 {
+		fmt.Println("Failed while attaching prog to compartment %v with err %v", backendID, reErr)
+		return
+	}
 
 	fmt.Println("running our scenario")
-	res1 := test_scenario(compID)
+	res1 := test_scenario(frontendID, backendID)
 	if res1 < 0 {
 
 		fmt.Println("Failed while running scenario")
@@ -109,12 +120,13 @@ func initialize() (*WinEbpfState, int) {
 	return state, 0
 }
 
-func test_scenario(compID int) int {
+func test_scenario(srcID, dstID int) int {
 
 	iptoid := map[string]uint32{
-		"10.240.0.16": 123,
-		"10.240.0.41": 456,
-		"10.240.0.15": 789,
+		"10.240.0.47": 123, // backend
+		"10.240.0.45": 456, // database
+		"10.240.0.39": 789, // frontend
+		"10.10.10.10": 10,  //joke
 	}
 
 	for ip, id := range iptoid {
@@ -127,11 +139,33 @@ func test_scenario(compID int) int {
 		}
 	}
 
-	retCode := C.update_global_policy_map(C.int(compID))
+	retCode := C.update_global_policy_map(C.int(srcID))
 	if retCode < 0 {
 		fmt.Println("Error: Could not get comp map fd")
 		return -1
 	}
+
+	retCode = C.update_global_policy_map(C.int(dstID))
+	if retCode < 0 {
+		fmt.Println("Error: Could not get comp map fd")
+		return -1
+	}
+
+	// manually creating frotendpolicy id to 700
+	// say compID is the frontend pod
+
+	// here we have compartment ID
+	gupdate_comp_policy_map(200, 443, 700, srcID, INGRESS, false) // allow ingress to frontend from anywhere on port 443
+	gupdate_comp_policy_map(200, 53, 700, srcID, EGRESS, false)   // allow egress from frontend to anywhere on port 53
+	gupdate_comp_policy_map(123, 0, 700, srcID, EGRESS, false)    // allow egress to backend (map above)
+
+	gupdate_comp_policy_map(789, 443, 700, dstID, INGRESS, false) // allow ingress from frontend on port 443
+	//temp - todo delete
+	gupdate_comp_policy_map(1, 2, 666, dstID, INGRESS, false)
+
+	// need compartment policy map
+	// create if doesn't exist policy map corresponding to frontendpolicy
+	// add keys and action to policy map
 
 	fmt.Println("All traffic should be dropped here")
 	fmt.Println("Sleeping now")
@@ -143,18 +177,8 @@ func test_scenario(compID int) int {
 	return 0
 }
 
-func test_scenarioFrontendPolicy() {
-	policies := []C.struct_policy_map_key{
-		{
-			remote_pod_label_id: C.uint(200),
-			remote_port:         C.ushort(443),
-			direction:           C.uchar(INGRESS),
-		},
-	}
-	fmt.Println(policies)
-}
-
 func gupdate_comp_policy_map(remote_label_id, remote_port, policy_id, compartment_id int, dir direction, delete bool) int {
+	fmt.Printf("Updating comp policy map with remote label: %d, remote port: %d, policy id: %d, compartment id: %d, direction: %s\n", remote_label_id, remote_port, policy_id, compartment_id, dir)
 	res := C.update_comp_policy_map(
 		C.int(remote_label_id),
 		C.direction_t(dir),
