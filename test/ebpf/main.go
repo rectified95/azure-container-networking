@@ -159,6 +159,7 @@ func test_scenario(compID int) int {
 }
 
 func gupdate_comp_policy_map(remote_label_id, remote_port, policy_id, compartment_id int, dir direction, delete bool) int {
+	fmt.Printf("Updating comp policy map with remote label: %d, remote port: %d, policy id: %d, compartment id: %d, direction: %s\n", remote_label_id, remote_port, policy_id, compartment_id, dir)
 	res := C.update_comp_policy_map(
 		C.int(remote_label_id),
 		C.direction_t(dir),
