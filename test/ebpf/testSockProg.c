@@ -2,9 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include "bpf/bpf.h"
+#include "ebpf_result.h"
+//#include "ebpf_api.h"
+#include "sal.h"
 #include "bpf/libbpf.h"
 #include "testSockProg.h"
+#include "bpf_endian.h"
 
+ebpf_result_t
+ebpf_object_unpin(const char* path);
 char *get_map_pin_path(const char *map_name)
 {
     char *map_pin_path = malloc(sizeof(char) * (strlen(map_name) + strlen(DEFAULT_MAP_PIN_PATH_PREFIX) + 1));
@@ -63,6 +69,10 @@ int pin_given_map(int internal_map_type, fd_t fd)
     }
     printf("pin_given_map: map pinned path %s\n", pin_path);
     fd_t fdnew = bpf_obj_get(pin_path);
+    //int res_unpin = bpf_obj_unpin(fd, pin_path);
+    //ebpf_result_t resunpin = ebpf_object_unpin(pin_path);
+    //printf("path %s unpin res %d\n", pin_path, res_unpin);
+    
     if (fdnew != INVALID_MAP_FD)
     {
         printf("pin_given_map: found the pinned map FD\n");
@@ -72,6 +82,9 @@ int pin_given_map(int internal_map_type, fd_t fd)
     printf("pin_given_map: pinned map not found, creating pin for map %s\n", map_name);
     // Map created. Now pin the map.
     int error = bpf_obj_pin(fd, pin_path);
+    //res_unpin = bpf_obj_unpin(fd, pin_path);
+    //printf("path %s unpin res %d\n", pin_path, res_unpin);
+    return 0;
     if (error != 0)
     {
         return -1;
@@ -90,6 +103,7 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     int program_fd;
     //int result = bpf_prog_load("src/endpoint_prog.o", BPF_PROG_TYPE_CGROUP_SOCK_ADDR, &object, &program_fd);
     int result = bpf_prog_load("src/endpoint_prog.o", BPF_PROG_TYPE_CGROUP_SOCK_ADDR, &object, &program_fd);
+    
 
     if (!object)
     {
@@ -402,12 +416,15 @@ int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint1
     return 0;
 }
 
-int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4, bool delete)
+int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4h, bool delete)
 {
-    printf("Updating ip cache map\n");
+    int ipv4 = bpf_htonl(ipv4h);
+
+    printf("Updating ip cache map for ip, before %u after %u\n",ipv4h, ipv4);
     fd_t ip_cache_map_fd = get_map_fd(IP_CACHE_MAP, 0);
     if (ip_cache_map_fd == INVALID_MAP_FD)
     {
+        printf("invalid map fd %u", ip_cache_map_fd);
         return INVALID_MAP_FD;
     }
 
@@ -421,7 +438,11 @@ int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4, bool delete)
         {
             printf("Error while updating ip cache map %d\n", result);
             return result;
-        }
+        }        
+
+        uint32_t value = 0;
+        bpf_map_lookup_elem(ip_cache_map_fd, &ip_cache_key, &value);
+        printf("retrieved value %u from fd %d\n", value, ip_cache_map_fd);
     }
     else
     {
@@ -432,6 +453,25 @@ int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4, bool delete)
             return result;
         }
     }
+
+    ip_address_t key = {0};
+    ip_address_t next_key = {0};
+    uint32_t value = 0;
+
+    int ret = _close(ip_cache_map_fd);
+    printf("fd close res: %d\n", ret);
+    //printf("Listing keys\n");
+    // printf("get next key %d\n", bpf_map_get_next_key(ip_cache_map_fd, &key, &next_key));
+    // while(bpf_map_get_next_key(ip_cache_map_fd, &key, &next_key) == 0) {
+    //     printf("Got key %u ", key.ipv4);
+    //     int res = bpf_map_lookup_elem(ip_cache_map_fd, &next_key, &value);
+    //     if(res < 0) {
+    //         printf("No value??\n");
+    //     } else {
+    //         printf("%u\n", value);
+    //     }
+    //     key=next_key;
+    // }
 
     printf("Done updating ip cache map\n");
     return 0;
