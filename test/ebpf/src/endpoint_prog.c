@@ -95,7 +95,7 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     { // (TODO) default ctx_label_id to 200 (ANY)
-        bpf_printk("No label found for IP, dropping packet.");
+        bpf_printk("No label found for IP %s during authorize V4, dropping packet.", ip_to_lookup);
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
         return BPF_SOCK_ADDR_VERDICT_REJECT;
@@ -136,7 +136,7 @@ authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     {
-        bpf_printk("No label found for IP, dropping packet.");
+        bpf_printk("No label found for IP %s during authorize V6, dropping packet.", ip_to_lookup);
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
         return BPF_SOCK_ADDR_VERDICT_REJECT;
@@ -154,7 +154,7 @@ authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
 SEC("cgroup/connect4")
 int authorize_connect4(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("Connect4 called.");
+    bpf_printk("Connect4 called srcip: %u, srcport: %u, dstip: %u, dstport: %u", ctx->msg_src_ip4, ctx->msg_src_port, ctx->msg_user_ip4, ctx->msg_user_ip4);
     return authorize_v4(ctx, EGRESS);
 }
 
@@ -168,7 +168,7 @@ int authorize_connect6(bpf_sock_addr_t *ctx)
 SEC("cgroup/recv_accept4")
 int authorize_recv_accept4(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("Recv_accept4 called.");
+    bpf_printk("Recv_accept4 called srcip: %u, srcport: %u, dstip: %u, dstport: %u", ctx->msg_src_ip4, ctx->msg_src_port, ctx->msg_user_ip4, ctx->msg_user_ip4);
     return authorize_v4(ctx, INGRESS);
 }
 
