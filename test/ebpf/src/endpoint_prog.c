@@ -3,6 +3,7 @@
 
 #include "bpf_helpers.h"
 #include "endpoint_prog.h"
+#include "bpf_endian.h"
 
 // define the policy map
 SEC("maps")
@@ -90,12 +91,13 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
             return BPF_SOCK_ADDR_VERDICT_PROCEED;
         }
         */
+       
 
     uint32_t *ctx_label_id = NULL;
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     { // (TODO) default ctx_label_id to 200 (ANY)
-        bpf_printk("No label found for IP %s during authorize V4, dropping packet.", ip_to_lookup);
+        bpf_printk("No label found for IP %u port %u, dropping packet.", bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
         return BPF_SOCK_ADDR_VERDICT_REJECT;
@@ -136,7 +138,7 @@ authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     {
-        bpf_printk("No label found for IP %s during authorize V6, dropping packet.", ip_to_lookup);
+        bpf_printk("No label found for IP %u, dstport %u, dropping packet.", bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
         return BPF_SOCK_ADDR_VERDICT_REJECT;
@@ -151,30 +153,36 @@ authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
     return _policy_eval(ctx, ctx->compartment_id, key);
 }
 
+
+
 SEC("cgroup/connect4")
 int authorize_connect4(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("Connect4 called srcip: %u, srcport: %u, dstip: %u, dstport: %u", ctx->msg_src_ip4, ctx->msg_src_port, ctx->msg_user_ip4, ctx->msg_user_ip4);
+    uint32_t hostip = bpf_ntohl(ctx->user_ip4);
+    bpf_printk("Connect4 called srcip: %u, dstip: %u, dstport: %u", bpf_ntohl(ctx->msg_src_ip4), bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
     return authorize_v4(ctx, EGRESS);
 }
 
 SEC("cgroup/connect6")
 int authorize_connect6(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("Connect6 called.");
+    bpf_printk("Connect6 called");
+
     return authorize_v6(ctx, EGRESS);
 }
 
 SEC("cgroup/recv_accept4")
 int authorize_recv_accept4(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("Recv_accept4 called srcip: %u, srcport: %u, dstip: %u, dstport: %u", ctx->msg_src_ip4, ctx->msg_src_port, ctx->msg_user_ip4, ctx->msg_user_ip4);
+    bpf_printk("Recv_accept4 called srcip: %u, dstip: %u, dstport: %u", bpf_ntohl(ctx->msg_src_ip4),  bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
+
     return authorize_v4(ctx, INGRESS);
 }
 
 SEC("cgroup/recv_accept6")
 int authorize_recv_accept6(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("Recv_accept6 called.");
+    bpf_printk("Recv_accept6 called");
+
     return authorize_v6(ctx, INGRESS);
 }

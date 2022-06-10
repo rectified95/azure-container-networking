@@ -4,6 +4,7 @@
 #include "bpf/bpf.h"
 #include "bpf/libbpf.h"
 #include "testSockProg.h"
+#include "bpf_endian.h"
 
 char *get_map_pin_path(const char *map_name)
 {
@@ -90,6 +91,7 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     int program_fd;
     //int result = bpf_prog_load("src/endpoint_prog.o", BPF_PROG_TYPE_CGROUP_SOCK_ADDR, &object, &program_fd);
     int result = bpf_prog_load("src/endpoint_prog.o", BPF_PROG_TYPE_CGROUP_SOCK_ADDR, &object, &program_fd);
+    
 
     if (!object)
     {
@@ -402,12 +404,15 @@ int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint1
     return 0;
 }
 
-int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4, bool delete)
+int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4h, bool delete)
 {
-    printf("Updating ip cache map\n");
+    int ipv4 = bpf_htonl(ipv4h);
+
+    printf("Updating ip cache map for ip, before %u after %u\n",ipv4h, ipv4);
     fd_t ip_cache_map_fd = get_map_fd(IP_CACHE_MAP, 0);
     if (ip_cache_map_fd == INVALID_MAP_FD)
     {
+        printf("invalid map fd %u", ip_cache_map_fd);
         return INVALID_MAP_FD;
     }
 
@@ -421,7 +426,11 @@ int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4, bool delete)
         {
             printf("Error while updating ip cache map %d\n", result);
             return result;
-        }
+        }        
+
+        uint32_t value = 0;
+        bpf_map_lookup_elem(ip_cache_map_fd, &ip_cache_key, &value);
+        printf("retrieved value %u from fd %d\n", value, ip_cache_map_fd);
     }
     else
     {
@@ -431,6 +440,24 @@ int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4, bool delete)
             printf("Error while deleting ip cache map\n");
             return result;
         }
+    }
+
+    ip_address_t key = {0};
+    ip_address_t next_key = {0};
+    uint32_t value = 0;
+    printf("Listing keys\n");
+
+    printf("get next key %d\n", bpf_map_get_next_key(ip_cache_map_fd, &key, &next_key));
+
+    while(bpf_map_get_next_key(ip_cache_map_fd, &key, &next_key) == 0) {
+        printf("Got key %u ", key.ipv4);
+        int res = bpf_map_lookup_elem(ip_cache_map_fd, &next_key, &value);
+        if(res < 0) {
+            printf("No value??\n");
+        } else {
+            printf("%u\n", value);
+        }
+        key=next_key;
     }
 
     printf("Done updating ip cache map\n");

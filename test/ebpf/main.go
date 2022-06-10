@@ -81,13 +81,13 @@ func main() {
 	// attach to frontend endpoint id
 	reErr := C.attach_progs_to_compartment(winState.epprog, C.int(frontendID))
 	if reErr < 0 {
-		fmt.Println("Failed while attaching prog to compartment")
+		fmt.Println("Failed while attaching prog to compartment %v with err %v", frontendID, reErr)
 		return
 	}
 
 	reErr = C.attach_progs_to_compartment(winState.epprog, C.int(backendID))
 	if reErr < 0 {
-		fmt.Println("Failed while attaching prog to compartment")
+		fmt.Println("Failed while attaching prog to compartment %v with err %v", backendID, reErr)
 		return
 	}
 
