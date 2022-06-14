@@ -4,7 +4,7 @@
 #include "bpf_helpers.h"
 #include "endpoint_prog.h"
 #include "bpf_endian.h"
-
+#define PIN_GLOBAL_NS 2
 // define the policy map
 SEC("maps")
 struct bpf_map_def compartment_policy_map = {
@@ -21,7 +21,8 @@ struct bpf_map_def map_policy_maps = {
     .key_size = sizeof(uint32_t),   // key is a compartment ID
     .value_size = sizeof(uint32_t), // value is ID of the policy map specific to that compartment
     .max_entries = MAX_POD_SIZE,    // max number of pods in test cluster
-    .inner_id = POLICY_MAP_ID};     // id of policy_map in the ELF file
+    .inner_id = POLICY_MAP_ID,  // id of policy_map in the ELF file
+    .pinning = PIN_GLOBAL_NS};     
 
 // declare ipCache map
 SEC("maps")
@@ -29,7 +30,8 @@ struct bpf_map_def ip_cache_map = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(ip_address_t),
     .value_size = sizeof(uint32_t),
-    .max_entries = IP_CACHE_MAP_SIZE};
+    .max_entries = IP_CACHE_MAP_SIZE,
+    .pinning = PIN_GLOBAL_NS};
 
 // TODO declare identity cache map
 
@@ -91,18 +93,20 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
             return BPF_SOCK_ADDR_VERDICT_PROCEED;
         }
         */
-       
 
     uint32_t *ctx_label_id = NULL;
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     { // (TODO) default ctx_label_id to 200 (ANY)
-        bpf_printk("No label found for IP %u port %u, dropping packet.", bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
+        //bpf_printk("No label found for IP %u port %u, dropping packet.", bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
         return BPF_SOCK_ADDR_VERDICT_REJECT;
     }
-
+    // } else {
+         bpf_printk("looked up label %d for ip %d", *ctx_label_id, ip_to_lookup.ipv4);
+    // }
+//scsc
     policy_map_key_t key = {0};
     key.remote_pod_label_id = *ctx_label_id;
     key.remote_port = ctx->user_port;

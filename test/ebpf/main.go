@@ -126,6 +126,7 @@ func test_scenario(srcID, dstID int) int {
 		"10.240.0.47": 123, // backend
 		"10.240.0.45": 456, // database
 		"10.240.0.39": 789, // frontend
+		"10.10.10.10": 10,  //joke
 	}
 
 	for ip, id := range iptoid {
