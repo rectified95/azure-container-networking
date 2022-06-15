@@ -28,7 +28,8 @@ func (dp *EBPF_DP) InitializeBPF() int {
 		return RET_ERR
 	}
 
-	fmt.Println("%+v", r.connect4_program)
+	fmt.Println("%+v", r.connect4_0_program)
+	fmt.Println("%+v", r.policy_eval_program)
 
 	fmt.Print("Done loading progs")
 	fmt.Println(r)

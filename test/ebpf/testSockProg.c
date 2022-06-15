@@ -94,7 +94,9 @@ int pin_given_map(int internal_map_type, fd_t fd)
 
 struct npm_endpoint_prog_t test_ebpf_prog()
 {
-    const char *connect4_program_name = "authorize_connect4";
+    const char *connect4_0_program_name = "authorize_connect4_0";
+    const char *policy_eval_program__name = "policy_eval_prog";
+
     const char *connect6_program_name = "authorize_connect6";
     const char *recv4_accept_program_name = "authorize_recv_accept4";
     const char *recv6_accept_program_name = "authorize_recv_accept6";
@@ -122,19 +124,34 @@ struct npm_endpoint_prog_t test_ebpf_prog()
 
     _npm_endpoint_prog_t.object = object;
 
-    printf("Getting the bpf_prog for connect program\n");
-    struct bpf_program *connect_program = bpf_object__find_program_by_name(object, connect4_program_name);
-    if (!connect_program)
+    printf("Getting the bpf_prog for connect program 4_0\n");
+    struct bpf_program *connect_0_program = bpf_object__find_program_by_name(object, connect4_0_program_name);
+    if (!connect_0_program)
     {
-        printf("%s is null\n", connect4_program_name);
+        printf("%s is null\n", connect4_0_program_name);
         return _npm_endpoint_prog_t;
     }
 
-    _npm_endpoint_prog_t.connect4_program = connect_program;
-    printf("connect program\n");
+    printf("Getting the bpf_prog for policy_eval program\n");
+    struct bpf_program *policy_eval_program = bpf_object__find_program_by_name(object, policy_eval_program__name);
+    if (!policy_eval_program)
+    {
+        printf("%s is null\n", policy_eval_program__name);
+        return _npm_endpoint_prog_t;
+    }
+
+    _npm_endpoint_prog_t.connect4_0_program = connect_0_program;
+    _npm_endpoint_prog_t.policy_eval_program = policy_eval_program;
+    fd_t callee1_fd = bpf_program__fd(policy_eval_program);
+    fd_t prog_map_fd = bpf_object__find_map_fd_by_name(object, "prog_array_map");
+    uint32_t index = 1;
+    bpf_map_update_elem(prog_map_fd, &index, &callee1_fd, 0);
+    printf("callee_1 close res %d", _close(callee1_fd));
+
+    printf("connect program \n");
 
     struct bpf_program *connect6_program = bpf_object__find_program_by_name(object, connect6_program_name);
-    if (!connect6_program)
+    if (!connect6_program) 
     {
         printf("%s is null\n", connect6_program_name);
         return _npm_endpoint_prog_t;
@@ -202,10 +219,16 @@ int attach_progs(struct npm_endpoint_prog_t npm_ep)
     printf("attaching progs\n");
     printf("attach V4 connect prog\n");
     // attach V4 connect prog
-    int result = bpf_prog_attach(bpf_program__fd(npm_ep.connect4_program), 0, BPF_CGROUP_INET4_CONNECT, 0);
+    int result = bpf_prog_attach(bpf_program__fd(npm_ep.connect4_0_program), 0, BPF_CGROUP_INET4_CONNECT, 0);
     if (result != 0)
     {
-        printf("Error is null while attaching v4 connect prog\n");
+        printf("Error is null while attaching v4_0 connect prog\n");
+        return result;
+    }
+    result = bpf_prog_attach(bpf_program__fd(npm_ep.policy_eval_program), 0, BPF_CGROUP_INET4_CONNECT, 0);
+    if (result != 0)
+    {
+        printf("Error is null while attaching v4_1 connect prog\n");
         return result;
     }
     printf("attach V6 connect prog\n");
@@ -242,12 +265,22 @@ int attach_progs_to_compartment(struct npm_endpoint_prog_t npm_ep, int compartme
     printf("attaching progs to compartment %d\n", compartment_id);
     printf("attach V4 connect prog\n");
     // attach V4 connect prog
-    int result = bpf_prog_attach(bpf_program__fd(npm_ep.connect4_program), compartment_id, BPF_CGROUP_INET4_CONNECT, 0);
+    fd_t connect_0_fd = bpf_program__fd(npm_ep.connect4_0_program);
+    fd_t connect_1_fd = bpf_program__fd(npm_ep.policy_eval_program);
+    //printf("connect_0_fd %d; connect_1_fd %d", connect_0_fd, connect_1_fd);
+    int result = bpf_prog_attach(connect_0_fd, compartment_id, BPF_CGROUP_INET4_CONNECT, 0);
     if (result != 0)
     {
-        printf("Error is null while attaching v4 connect prog\n");
+        printf("Error is null while attaching v4_0 connect prog\n");
         return result;
     }
+    printf("attached program %s to comp_id %d", "connect_4_0", compartment_id);
+    // result = bpf_prog_attach(connect_1_fd, compartment_id, BPF_CGROUP_INET4_CONNECT, 0);
+    // if (result != 0)
+    // {
+    //     printf("Error is null while attaching v4_1 connect prog\n");
+    //     return result;
+    // }
     printf("attach V6 connect prog\n");
     // attach V6 connect prog
     bpf_prog_attach(bpf_program__fd(npm_ep.connect6_program), compartment_id, BPF_CGROUP_INET6_CONNECT, 0);
@@ -264,6 +297,8 @@ int attach_progs_to_compartment(struct npm_endpoint_prog_t npm_ep, int compartme
         printf("Error is null while attaching v4 recv prog\n");
         return result;
     }
+    printf("attached program %s to comp_id %d", "recv_4", compartment_id);
+
     printf("attach V6 recv prog\n");
     // attach V6 recv prog
 
@@ -388,13 +423,20 @@ int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint1
     {
         return INVALID_MAP_FD;
     }
+    policy_map_key_t key = {0};
+    key.remote_pod_label_id = remote_pod_label_id;
+    key.direction = direction;
+    key.remote_port = htons(remote_port);
+    key.protocol = 0;
 
-    policy_map_key_t key = {
-        .remote_pod_label_id = remote_pod_label_id,
-        .direction = direction,
-        .remote_port = remote_port,
-    };
-
+    printf("printing label %d dir %d port %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
+    char* conv_key = (char*)&key;
+    for (int i =0; i< sizeof(policy_map_key_t); ++i) {
+        printf("%02x ", conv_key[i]);
+        
+    }
+    printf("\n");
+    
     if (!delete)
     {
         int result = bpf_map_update_elem(comp_policy_map_fd, &key, &policy_id, 0);
@@ -403,6 +445,9 @@ int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint1
             printf("Error while updating comp policy map\n");
             return result;
         }
+        int lookup_val;
+        bpf_map_lookup_elem(comp_policy_map_fd, &key, &lookup_val);
+        printf("looked up val %d", lookup_val);
     }
     else
     {
