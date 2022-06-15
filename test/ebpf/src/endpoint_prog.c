@@ -39,7 +39,9 @@ __inline int
 _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key)
 {
     uint32_t *verdict = NULL;
+    bpf_printk("inside policy\n");
     void *policy_map_fd = (uint32_t *)bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
+    bpf_printk("after lookup policy\n");
     if (policy_map_fd == NULL)
     {
         //bpf_printk("Policy Eval: No policy map for compartment");
@@ -49,7 +51,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     };
     //else {
-        bpf_printk("com_policy map found for compartmentid: %d, direction: %d, remote port: %d\n", compartment_id);
+        bpf_printk("com_policy map found for compartmentid: %d, direction: %d\n", compartment_id, key.direction);
     //}   
 
     // Look up L4 first
