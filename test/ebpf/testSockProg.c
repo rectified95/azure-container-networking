@@ -186,13 +186,13 @@ struct npm_endpoint_prog_t test_ebpf_prog()
         return _npm_endpoint_prog_t;
     }
 
-    err = pin_given_map(IP_CACHE_MAP, bpf_map__fd(ip_cache_map_obj));
-    if (err < 0)
-    {
-        printf("Failed to pin ip cache MAP\n");
-        return _npm_endpoint_prog_t;
-    }
-    printf("DONE pinning ip cache MAP\n");
+    // err = pin_given_map(IP_CACHE_MAP, bpf_map__fd(ip_cache_map_obj));
+    // if (err < 0)
+    // {
+    //     printf("Failed to pin ip cache MAP\n");
+    //     return _npm_endpoint_prog_t;
+    // }
+    // printf("DONE pinning ip cache MAP\n");
 
     return _npm_endpoint_prog_t;
 }
@@ -355,29 +355,47 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
 
 int update_global_policy_map(int compartment_id)
 {
-    printf("In update_global_policy_map func\n");
-    fd_t compartment_policy_map_fd = get_map_fd(COMP_POLICY_MAP, compartment_id);
-    if (compartment_policy_map_fd == INVALID_MAP_FD)
-    {
-        return -1;
-    }
+    // printf("In update_global_policy_map func\n");
+    // fd_t compartment_policy_map_fd = get_map_fd(COMP_POLICY_MAP, compartment_id);
+    // if (compartment_policy_map_fd == INVALID_MAP_FD)
+    // {
+    //     return -1;
+    // }
 
-    printf("Retrieving global policy map\n");
-    fd_t global_policy_map_fd = get_map_fd(GLOBAL_POLICY_MAP, 0);
-    if (global_policy_map_fd == INVALID_MAP_FD)
-    {
-        return INVALID_MAP_FD;
-    }
+    // compartment_policy_map_fd = htonl(compartment_policy_map_fd);
 
-    // Update the global policy map
-    int error = bpf_map_update_elem(global_policy_map_fd, &compartment_id, &compartment_policy_map_fd, BPF_ANY);
-    printf("updated global policy map: com_id %d comp_map_fd %d", compartment_id, compartment_policy_map_fd);
-    if (error != 0)
-    {
-        printf("Error while updating global policy map\n");
-        return error;
-    }
-    return 0;
+
+    // printf("Retrieving global policy map\n");
+    // fd_t global_policy_map_fd = get_map_fd(GLOBAL_POLICY_MAP, 0);
+    // if (global_policy_map_fd == INVALID_MAP_FD)
+    // {
+    //     return INVALID_MAP_FD;
+    // }
+
+    // // Update the global policy map
+    // int error = bpf_map_update_elem(global_policy_map_fd, &compartment_id, &compartment_policy_map_fd, BPF_ANY);
+    // printf("updated global policy map: com_id %d comp_map_fd %d\n", compartment_id, compartment_policy_map_fd);
+    // if (error != 0)
+    // {
+    //     printf("Error while updating global policy map\n");
+    //     return error;
+    // }
+    // return 0;
+    
+    // char * comp_map_name = malloc(sizeof(char) * 12); // policy_mapX + '\0'
+    // strcpy(comp_map_name, "policy_map");
+    const char* outer_map_name = "outer_map";
+    struct bpf_map* outer_map = bpf_object__find_map_by_name(obj, outer_map_name);
+    int inner_map_fd = bpf_create_map_name(
+        BPF_MAP_TYPE_HASH,   // type
+        "policy_map_3", // name
+        sizeof(__u32),       // key_size
+        sizeof(__u32),       // value_size
+        8,                   // max_entries
+        0);                  // flag
+    __u32 outer_key = 3;
+    bpf_map_update_elem(outer_map_fd, &outer_key, &inner_map_fd, 0 /* flag */);
+    close(inner_map_fd); // Important!
 }
 
 int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint16_t remote_port, int compartment_id, int policy_id, bool delete)

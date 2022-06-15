@@ -46,6 +46,7 @@ int attach_progs_to_compartment(struct npm_endpoint_prog_t npm_ep, int compartme
 int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint16_t remote_port, int compartment_id, int policy_id, bool delete);
 int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4, bool delete);
 int update_global_policy_map(int compartment_id);
+//int update_global_policy_map_correct(int compartment_id);
 
 typedef struct bpf_object go_bpf_obj;
 typedef int32_t fd_t;

@@ -140,16 +140,16 @@ func test_scenario(srcID, dstID int) int {
 	}
 
 	retCode := C.update_global_policy_map(C.int(srcID))
-	if retCode < 0 {
-		fmt.Println("Error: Could not get comp map fd")
-		return -1
-	}
+	// if retCode < 0 {
+	// 	fmt.Println("Error: Could not get comp map fd")
+	// 	return -1
+	// }
 
-	retCode = C.update_global_policy_map(C.int(dstID))
-	if retCode < 0 {
-		fmt.Println("Error: Could not get comp map fd")
-		return -1
-	}
+	// retCode = C.update_global_policy_map(C.int(dstID))
+	// if retCode < 0 {
+	// 	fmt.Println("Error: Could not get comp map fd")
+	// 	return -1
+	// }
 
 	// manually creating frotendpolicy id to 700
 	// say compID is the frontend pod
