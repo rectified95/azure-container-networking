@@ -51,7 +51,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     };
     //else {
-        bpf_printk("com_policy map found for compartmentid: %d, direction: %d\n", compartment_id, key.direction);
+        bpf_printk("com_policy map found for compartmentid: %d, policy_map_fd: %d\n", compartment_id, *(uint32_t*)policy_map_fd);
     //}   
 
     // Look up L4 first
