@@ -39,10 +39,11 @@ __inline int
 _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key)
 {
     uint32_t *verdict = NULL;
-    bpf_printk("inside policy\n");
-    uint32_t *policy_map_fd = bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
+    
+    uint32_t *policy_map_fd = NULL;
+    policy_map_fd = (uint32_t *)bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
     if (policy_map_fd == NULL)
-    {
+    {   bpf_printk("policy map not found\n");
         //bpf_printk("Policy Eval: No policy map for compartment");
         // if there is no policy map attached to this compartment
         // then no policy is applied, allow all traffic.
