@@ -47,7 +47,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         // then no policy is applied, allow all traffic.
         bpf_printk("com_policy_map NOT found for compartmentid: %d - allowing traffic\n", compartment_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
-    }
+    };
     //else {
     //    bpf_printk("com_policy map found for compartmentid: %d, direction: %d, remote port: %d\n", compartment_id);
     //}   
