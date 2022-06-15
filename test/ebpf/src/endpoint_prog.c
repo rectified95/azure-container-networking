@@ -55,7 +55,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         //bpf_printk("com_policy map found for compartmentid: %d\n", compartment_id);
     //}   
 
-    // Look up L4 first
+    // Look up L4 first 
     //bpf_printk("found com_policy_fd %d for com_id %d\n", *(uint32_t *) policy_map_fd, compartment_id);
     verdict = bpf_map_lookup_elem(policy_map_fd, &key);
     bpf_printk("policy_map_fd: %d\n", *(uint32_t *)policy_map_fd);
