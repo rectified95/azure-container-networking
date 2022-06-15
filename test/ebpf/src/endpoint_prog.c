@@ -60,7 +60,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         // char msg[128];
         //bpf_printk("Policy Eval: L4 policy ID %lu Allowed.", *verdict);
         // bpf_printk(msg);
-        bpf_printk("found rule for remote label\n", key.remote_pod_label_id);
+        //bpf_printk("found rule for remote label\n", key.remote_pod_label_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }//else {
        // bpf_printk("no L4 rules found for labelid: %d, direction: %d, remote port: %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
