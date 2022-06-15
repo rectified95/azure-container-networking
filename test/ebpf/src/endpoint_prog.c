@@ -88,10 +88,10 @@ __inline int
 authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
 {
     ip_address_t ip_to_lookup = {0};
-    ip_to_lookup.ipv4 = ctx->msg_src_ip4;
+    ip_to_lookup.ipv4 = ctx->user_ip4;
     if (dir == INGRESS)
     {
-        ip_to_lookup.ipv4 = ctx->user_ip4;
+        ip_to_lookup.ipv4 = ctx->msg_src_ip4;
     }
 
     /*
@@ -110,7 +110,7 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     { // (TODO) default ctx_label_id to 200 (ANY)
-        //bpf_printk("No label found for IP %u port %u, dropping packet.", bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
+        bpf_printk("No label found for IP %u port %u, dropping packet.", bpf_ntohl(ip_to_lookup.ipv4), bpf_ntohs(ctx->user_port));
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
         return BPF_SOCK_ADDR_VERDICT_REJECT;
