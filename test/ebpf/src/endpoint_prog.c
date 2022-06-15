@@ -53,7 +53,6 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         bpf_printk("no map policy found for compartmentid: %d, direction: %d, remote port: %d\n", compartment_id);
     }   
 
-
     // Look up L4 first
     verdict = bpf_map_lookup_elem(policy_map_fd, &key);
     if (verdict != NULL)
@@ -65,7 +64,6 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
     }else {
        // bpf_printk("no L4 rules found for labelid: %d, direction: %d, remote port: %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
     }   
-
 
     // Look up L3 rules
     key.remote_port = 0;
@@ -79,7 +77,6 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
     } else {
        // bpf_printk("no L3 rules found for labelid: %d, direction: %d, remote port: %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
     }   
-
 
     return BPF_SOCK_ADDR_VERDICT_REJECT;
 }
@@ -110,15 +107,14 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     { // (TODO) default ctx_label_id to 200 (ANY)
-        bpf_printk("No label found for IP %u port %u, dropping packet.", bpf_ntohl(ip_to_lookup.ipv4), bpf_ntohs(ctx->user_port));
+        //bpf_printk("No label found for IP %u port %u, dropping packet.", bpf_ntohl(ip_to_lookup.ipv4), bpf_ntohs(ctx->user_port));
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
         return BPF_SOCK_ADDR_VERDICT_REJECT;
     }
-    // } else {
-         bpf_printk("looked up label %d for ip %d in direction %d", *ctx_label_id, ip_to_lookup.ipv4, dir);
-    // }
-//scsc
+    
+    bpf_printk("looked up label %d for ip %d in direction %d", *ctx_label_id, ip_to_lookup.ipv4, dir);
+    
     policy_map_key_t key = {0};
     key.remote_pod_label_id = *ctx_label_id;
     key.remote_port = ctx->user_port;
