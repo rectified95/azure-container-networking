@@ -44,7 +44,8 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
     void *policy_map_fd = NULL;
     policy_map_fd = (uint32_t *)bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
     if (policy_map_fd == NULL)
-    {   bpf_printk("policy map not found\n");
+    {   
+        bpf_printk("policy map not found\n");
         //bpf_printk("Policy Eval: No policy map for compartment");
         // if there is no policy map attached to this compartment
         // then no policy is applied, allow all traffic.
@@ -55,7 +56,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         //bpf_printk("com_policy map found for compartmentid: %d\n", compartment_id);
     //}   
 
-    // Look up L4 first
+    // Look up L4 first 
     //bpf_printk("found com_policy_fd %d for com_id %d\n", *(uint32_t *) policy_map_fd, compartment_id);
     verdict = bpf_map_lookup_elem(policy_map_fd, &key);
     bpf_printk("policy_map_fd: %d\n", *(uint32_t *)policy_map_fd);
@@ -68,7 +69,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         //bpf_printk("found rule for remote label\n", key.remote_pod_label_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
-    bpf_printk("policy not found\n");
+    //bpf_printk("policy not found\n");
     //else {
        // bpf_printk("no L4 rules found for labelid: %d, direction: %d, remote port: %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
     //}   
