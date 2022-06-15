@@ -26,9 +26,9 @@ typedef enum direction
 typedef struct policy_map_key
 {
     uint32_t remote_pod_label_id;
-    // uint8_t protocol;  by default, we are using TCP protocol
     uint8_t direction;
     uint16_t remote_port;
+    uint8_t protocol; // by default, we are using TCP protocol
 } policy_map_key_t;
 
 typedef struct ip_address
@@ -68,7 +68,8 @@ struct _map_properties
 struct npm_endpoint_prog_t
 {
     struct bpf_object *object;
-    struct bpf_program *connect4_program;
+    struct bpf_program *connect4_0_program;
+    struct bpf_program *connect4_1_program;
     struct bpf_program *connect6_program;
     struct bpf_program *recv4_accept_program;
     struct bpf_program *recv6_accept_program;

@@ -34,39 +34,54 @@ struct bpf_map_def ip_cache_map = {
     .max_entries = IP_CACHE_MAP_SIZE,
     .pinning = PIN_GLOBAL_NS};
 
+SEC("maps")
+struct bpf_map_def prog_array_map = {
+    .type = BPF_MAP_TYPE_PROG_ARRAY,
+    .key_size = sizeof(uint32_t), 
+    .value_size = sizeof(uint32_t), 
+    .max_entries = 2};
+
+SEC("maps")
+struct bpf_map_def tail_call_state_cache = {
+    .type = BPF_MAP_TYPE_HASH,
+    .key_size = sizeof(bpf_sock_addr_t),    // key - ctx
+    .value_size = sizeof(tail_cache_val_t), // val - struct {remote_pod_label; direction}
+    .max_entries = 100};
+
 // TODO declare identity cache map
 
 __inline int
-_policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key)
+_policy_eval(bpf_sock_addr_t *ctx)
 {
-    uint32_t *verdict = NULL;
+    bpf_sock_addr_t ctx_cpy = *ctx;
+    tail_cache_val_t* cache_val = (tail_cache_val_t*) bpf_map_lookup_elem(&tail_call_state_cache, &ctx_cpy);
+    uint32_t comp_id = ctx->compartment_id;
+    policy_map_key_t key = {0};
+    if (!cache_val) {
+        return BPF_SOCK_ADDR_VERDICT_REJECT;
+    }
+    key.remote_pod_label_id = cache_val->remote_label;
+    key.remote_port = ctx->user_port;
+    key.protocol = 0;
+    key.direction = cache_val->direction;
     
-    void *policy_map_fd = NULL;
-    policy_map_fd = (uint32_t *)bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
-    if (policy_map_fd == NULL)
-    {   
-        bpf_printk("policy map not found\n");
-        //bpf_printk("Policy Eval: No policy map for compartment");
-        // if there is no policy map attached to this compartment
-        // then no policy is applied, allow all traffic.
-        //bpf_printk("com_policy_map NOT found for compartmentid: %d - allowing traffic\n", compartment_id);
+    bpf_map_delete_elem(&tail_call_state_cache, &ctx_cpy);
+    
+    void *policy_map_id = (uint32_t *)bpf_map_lookup_elem(&map_policy_maps, &comp_id);
+    if (policy_map_id == NULL)
+    {
+        // If there is no policy map attached to this compartment, then no policy is applied, allow all traffic.
+        bpf_printk("Policy Eval: No policy map for compartment id %d - allowing traffic.", ctx->compartment_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     };
-    //else {
-        //bpf_printk("com_policy map found for compartmentid: %d\n", compartment_id);
-    //}   
+    
+    bpf_printk("com_policy map found; remoteLabel %d, port %d, dir %d\n", key.remote_pod_label_id, key.remote_port, key.direction);  
 
     // Look up L4 first 
-    //bpf_printk("found com_policy_fd %d for com_id %d\n", *(uint32_t *) policy_map_fd, compartment_id);
-    verdict = bpf_map_lookup_elem(policy_map_fd, &key);
-    bpf_printk("policy_map_fd: %d\n", *(uint32_t *)policy_map_fd);
+    uint32_t *verdict = bpf_map_lookup_elem(policy_map_id, &key);
     if (verdict != NULL)
     {
-        // bpf_printk("policy found id: %d\n", *verdict);
-        // char msg[128];
-        //bpf_printk("Policy Eval: L4 policy ID %lu Allowed.", *verdict);
-        // bpf_printk(msg);
-        //bpf_printk("found rule for remote label\n", key.remote_pod_label_id);
+        //bpf_printk("Policy Eval: L4 policy ID %lu Allowed, remote_pod_label %d.", *verdict, key.remote_pod_label_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
     //bpf_printk("policy not found\n");
@@ -79,13 +94,10 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
     // verdict = bpf_map_lookup_elem(policy_map_fd, &key);
     // if (verdict != NULL)
     // {
-    //     // char msg[128];
     //    // bpf_printk("Policy Eval: L3 policy ID %lu Allowed.", *verdict);
-    //     // bpf_printk(msg);
     //     return BPF_SOCK_ADDR_VERDICT_PROCEED;
-    // } else {
-    //    // bpf_printk("no L3 rules found for labelid: %d, direction: %d, remote port: %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
-    // }   
+    // bpf_printk("no L3 rules found for labelid: %d, direction: %d, remote port: %d\n", 
+    //     key.remote_pod_label_id, key.direction, key.remote_port);   
 
     return BPF_SOCK_ADDR_VERDICT_REJECT;
 }
@@ -100,38 +112,27 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         ip_to_lookup.ipv4 = ctx->msg_src_ip4;
     }
 
-    /*
-        uint32_t comp_id =  ctx->compartment_id;
-        int32_t *policy_map_fd =  (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &comp_id);
-        if (policy_map_fd == NULL)
-        {
-            bpf_printk("Policy Eval: No policy map for compartment");
-            // if there is no policy map attached to this compartment
-            // then no policy is applied, allow all traffic.
-            return BPF_SOCK_ADDR_VERDICT_PROCEED;
-        }
-        */
-
     uint32_t *ctx_label_id = NULL;
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
-    { // (TODO) default ctx_label_id to 200 (ANY)
-        //bpf_printk("No label found for IP %u port %u, dropping packet.", bpf_ntohl(ip_to_lookup.ipv4), bpf_ntohs(ctx->user_port));
+    {   // (TODO) default ctx_label_id to 200 (ANY)
+        // bpf_printk("No label found for IP %u port %u, dropping packet.",
+        //     bpf_ntohl(ip_to_lookup.ipv4), bpf_ntohs(ctx->user_port));
+        // (TODO) comment different from code
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
         return BPF_SOCK_ADDR_VERDICT_REJECT;
     }
     
-    bpf_printk("looked up label %d for remote ip %d on comp_id %d\n", 
-         *ctx_label_id, ip_to_lookup.ipv4, ctx->compartment_id);
-    
-    policy_map_key_t key = {0};
-    key.remote_pod_label_id = *ctx_label_id;
-    key.remote_port = ctx->user_port;
-    // key.protocol = ctx->protocol;
-    key.direction = dir;
+    bpf_printk("Looked up label %d for remote ip %d\n", 
+        *ctx_label_id, ip_to_lookup.ipv4);
 
-    return _policy_eval(ctx, ctx->compartment_id, key);
+    tail_cache_val_t cache = {0};
+    cache.direction = dir;
+    cache.remote_label = *ctx_label_id;
+    bpf_sock_addr_t ctx_cpy = *ctx;
+    bpf_map_update_elem(&tail_call_state_cache, &ctx_cpy, &cache, 0);
+    return 0; // (TODO) this is failure code, not needed, change method signature to VOID
 }
 
 __inline int
@@ -172,17 +173,29 @@ authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
     // key.protocol = ctx->protocol;
     key.direction = dir;
 
-    return _policy_eval(ctx, ctx->compartment_id, key);
+    return _policy_eval(ctx);//, ctx->compartment_id, key);
 }
 
 
 
-SEC("cgroup/connect4")
-int authorize_connect4(bpf_sock_addr_t *ctx)
+SEC("cgroup/connect4_0")
+int authorize_connect4_0(bpf_sock_addr_t *ctx)
 {
-    uint32_t hostip = bpf_ntohl(ctx->user_ip4);
-    bpf_printk("Connect4 called srcip: %u, dstip: %u, dstport: %u", bpf_ntohl(ctx->msg_src_ip4), bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
-    return authorize_v4(ctx, EGRESS);
+    // bpf_printk("1. tail call link - inside connect4_0");
+    // bpf_printk("Connect4 called srcip: %u, dstip: %u, dstport: %u", 
+    //     bpf_ntohl(ctx->msg_src_ip4), bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
+    
+    int auth_4_0_res = authorize_v4(ctx, EGRESS);
+    bpf_tail_call(ctx, &prog_array_map, 1);
+
+    return BPF_SOCK_ADDR_VERDICT_REJECT; // tail call failed so abort
+}
+
+SEC("cgroup/connect4_1")
+int authorize_connect4_1(bpf_sock_addr_t *ctx)
+{
+    bpf_printk("2. tail call link - inside connect4_1");
+    return _policy_eval(ctx);
 }
 
 SEC("cgroup/connect6")
