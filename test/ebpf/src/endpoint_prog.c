@@ -12,7 +12,8 @@ struct bpf_map_def compartment_policy_map = {
     .key_size = sizeof(policy_map_key_t), // key is remote label id + direction + port/proto
     .value_size = sizeof(uint32_t),       // value is policy ID
     .max_entries = POLICY_MAP_SIZE,
-    .id = POLICY_MAP_ID};
+    .id = POLICY_MAP_ID,
+    .pinning = PIN_GLOBAL_NS};
 
 // define the outer map of policy map policy map
 SEC("maps")
@@ -40,7 +41,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
 {
     uint32_t *verdict = NULL;
     
-    uint32_t *policy_map_fd = NULL;
+    void *policy_map_fd = NULL;
     policy_map_fd = (uint32_t *)bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
     if (policy_map_fd == NULL)
     {   bpf_printk("policy map not found\n");
@@ -51,20 +52,20 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     };
     //else {
-        bpf_printk("com_policy map found for compartmentid: %d, policy_map_fd: %d\n", compartment_id, *policy_map_fd);
+        bpf_printk("com_policy map found for compartmentid: %d\n", compartment_id);
     //}   
 
     // Look up L4 first
     //bpf_printk("found com_policy_fd %d for com_id %d\n", *(uint32_t *) policy_map_fd, compartment_id);
-    //verdict = bpf_map_lookup_elem(policy_map_fd, &key);
-    // if (verdict != NULL)
-    // {
-    //     // char msg[128];
-    //     //bpf_printk("Policy Eval: L4 policy ID %lu Allowed.", *verdict);
-    //     // bpf_printk(msg);
-    //     //bpf_printk("found rule for remote label\n", key.remote_pod_label_id);
-    //     return BPF_SOCK_ADDR_VERDICT_PROCEED;
-    // }//else {
+    verdict = bpf_map_lookup_elem(policy_map_fd, &key);
+    if (verdict != NULL)
+    {
+        // char msg[128];
+        //bpf_printk("Policy Eval: L4 policy ID %lu Allowed.", *verdict);
+        // bpf_printk(msg);
+        //bpf_printk("found rule for remote label\n", key.remote_pod_label_id);
+        return BPF_SOCK_ADDR_VERDICT_PROCEED;
+    }//else {
        // bpf_printk("no L4 rules found for labelid: %d, direction: %d, remote port: %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
     //}   
 
@@ -116,8 +117,8 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         return BPF_SOCK_ADDR_VERDICT_REJECT;
     }
     
-    // bpf_printk("looked up label %d for remote ip %d on comp_id %d\n", 
-    //     *ctx_label_id, ip_to_lookup.ipv4, ctx->compartment_id);
+    bpf_printk("looked up label %d for remote ip %d on comp_id %d\n", 
+         *ctx_label_id, ip_to_lookup.ipv4, ctx->compartment_id);
     
     policy_map_key_t key = {0};
     key.remote_pod_label_id = *ctx_label_id;
