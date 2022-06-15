@@ -38,6 +38,8 @@ struct bpf_map_def ip_cache_map = {
 __inline int
 _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key)
 {
+    bpf_printk("eval for compartmentid: %d, direction: %d, remote port: %d\n", compartment_id);
+
     uint32_t *verdict = NULL;
     void *policy_map_fd = (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &compartment_id);
     if (policy_map_fd == NULL)
@@ -61,7 +63,7 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         // bpf_printk(msg);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }else {
-        //bpf_printk("no L4 rules found for labelid: %d, direction: %d, remote port: %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
+        bpf_printk("no L4 rules found for labelid: %d, direction: %d, remote port: %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
     }   
 
 
@@ -75,8 +77,9 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         // bpf_printk(msg);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     } else {
-        //bpf_printk("no L3 rules found for labelid: %d, direction: %d, remote port: %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
+        bpf_printk("no L3 rules found for labelid: %d, direction: %d, remote port: %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
     }   
+
 
     return BPF_SOCK_ADDR_VERDICT_REJECT;
 }
