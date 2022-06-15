@@ -45,11 +45,11 @@ _policy_eval(bpf_sock_addr_t *ctx, uint32_t compartment_id, policy_map_key_t key
         //bpf_printk("Policy Eval: No policy map for compartment");
         // if there is no policy map attached to this compartment
         // then no policy is applied, allow all traffic.
-        bpf_printk("com_policy_map NOT found for compartmentid: %d - allowing traffic\n", compartment_id);
+        //bpf_printk("com_policy_map NOT found for compartmentid: %d - allowing traffic\n", compartment_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     };
     //else {
-    //    bpf_printk("com_policy map found for compartmentid: %d, direction: %d, remote port: %d\n", compartment_id);
+        bpf_printk("com_policy map found for compartmentid: %d, direction: %d, remote port: %d\n", compartment_id);
     //}   
 
     // Look up L4 first
@@ -114,8 +114,8 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         return BPF_SOCK_ADDR_VERDICT_REJECT;
     }
     
-    bpf_printk("looked up label %d for remote ip %d on comp_id %d\n", 
-        *ctx_label_id, ip_to_lookup.ipv4, ctx->compartment_id);
+    // bpf_printk("looked up label %d for remote ip %d on comp_id %d\n", 
+    //     *ctx_label_id, ip_to_lookup.ipv4, ctx->compartment_id);
     
     policy_map_key_t key = {0};
     key.remote_pod_label_id = *ctx_label_id;
