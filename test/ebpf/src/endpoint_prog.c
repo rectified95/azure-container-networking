@@ -6,14 +6,14 @@
 #include "bpf_endian.h"
 #define PIN_GLOBAL_NS 2
 // define the policy map
-SEC("maps")
-struct bpf_map_def compartment_policy_map = {
-    .type = BPF_MAP_TYPE_HASH,
-    .key_size = sizeof(policy_map_key_t), // key is remote label id + direction + port/proto
-    .value_size = sizeof(uint32_t),       // value is policy ID
-    .max_entries = POLICY_MAP_SIZE,
-    .id = POLICY_MAP_ID,
-    .pinning = PIN_GLOBAL_NS};
+// SEC("maps")
+// struct bpf_map_def compartment_policy_map = {
+//     .type = BPF_MAP_TYPE_HASH,
+//     .key_size = sizeof(policy_map_key_t), // key is remote label id + direction + port/proto
+//     .value_size = sizeof(uint32_t),       // value is policy ID
+//     .max_entries = POLICY_MAP_SIZE,
+//     .id = POLICY_MAP_ID,
+//     .pinning = PIN_GLOBAL_NS};
 
 // define the outer map of policy map policy map
 SEC("maps")
@@ -21,9 +21,9 @@ struct bpf_map_def map_policy_maps = {
     .type = BPF_MAP_TYPE_ARRAY_OF_MAPS,
     .key_size = sizeof(uint32_t),   // key is a compartment ID
     .value_size = sizeof(uint32_t), // value is ID of the policy map specific to that compartment
-    .max_entries = MAX_POD_SIZE,    // max number of pods in test cluster
-    .inner_id = POLICY_MAP_ID,  // id of policy_map in the ELF file
-    .pinning = PIN_GLOBAL_NS};     
+    .max_entries = MAX_POD_SIZE, };   // max number of pods in test cluster
+    //.inner_id = POLICY_MAP_ID,};  // id of policy_map in the ELF file
+    //.pinning = PIN_GLOBAL_NS};     
 
 // declare ipCache map
 SEC("maps")
@@ -31,8 +31,8 @@ struct bpf_map_def ip_cache_map = {
     .type = BPF_MAP_TYPE_HASH,
     .key_size = sizeof(ip_address_t),
     .value_size = sizeof(uint32_t),
-    .max_entries = IP_CACHE_MAP_SIZE,
-    .pinning = PIN_GLOBAL_NS};
+    .max_entries = IP_CACHE_MAP_SIZE,};
+    //.pinning = PIN_GLOBAL_NS};
 
 // TODO declare identity cache map
 

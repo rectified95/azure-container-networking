@@ -162,29 +162,85 @@ struct npm_endpoint_prog_t test_ebpf_prog()
 
     _npm_endpoint_prog_t.recv6_accept_program = recv6_accept_program;
     printf("recv6 program\n");
-    printf("Now getting MAP fds and pinning them\n");
 
-    struct bpf_map *map_policy_maps_obj = bpf_object__find_map_by_name(object, "map_policy_maps");
-    if (map_policy_maps_obj == NULL)
-    {
-        printf("global policy map is null\n");
-        return _npm_endpoint_prog_t;
-    }
 
-    int err = pin_given_map(GLOBAL_POLICY_MAP, bpf_map__fd(map_policy_maps_obj));
-    if (err < 0)
-    {
-        printf("Failed to pin GLOBAL POLICY MAP\n");
-        return _npm_endpoint_prog_t;
-    }
-    printf("DONE pinning GLOBAL POLICY MAP\n");
 
-    struct bpf_map *ip_cache_map_obj = bpf_object__find_map_by_name(object, "ip_cache_map");
-    if (ip_cache_map_obj == NULL)
-    {
-        printf("ip cache map is null\n");
-        return _npm_endpoint_prog_t;
-    }
+    printf("Now getting filling outer map\n");
+
+    // create outer map
+    struct bpf_map *outer_map = bpf_object__find_map_by_name(object, "map_policy_maps");
+    int inner_map_fd = bpf_create_map(
+        BPF_MAP_TYPE_HASH,  // type
+        sizeof(__u32),      // key_size
+        sizeof(__u32),      // value_size
+        8,                  // max_entries
+        0);                 // flag
+    bpf_map__set_inner_map_fd(outer_map, inner_map_fd); //set dummy inner map
+    bpf_object__load(object);
+    close(inner_map_fd); // Important!
+
+    // insert into outer map
+    int outer_map_fd = bpf_object__find_map_fd_by_name(object, "map_policy_maps");
+    inner_map_fd = bpf_create_map_name(
+        BPF_MAP_TYPE_HASH,   // type
+        "comp_policy_map_3", // name
+        sizeof(__u32),       // key_size
+        sizeof(policy_map_key_t),       // value_size
+        8,                   // max_entries
+        0);                  // flag
+    __u32 outer_key = 3;
+    bpf_map_update_elem(outer_map_fd, &outer_key, &inner_map_fd, 0 /* flag */);
+    close(inner_map_fd); // Important!
+
+    inner_map_fd = bpf_create_map_name(
+        BPF_MAP_TYPE_HASH,   // type
+        "comp_policy_map_8", // name
+        sizeof(__u32),       // key_size
+        sizeof(policy_map_key_t),       // value_size
+        8,                   // max_entries
+        0);                  // flag
+    outer_key = 8;
+    bpf_map_update_elem(outer_map_fd, &outer_key, &inner_map_fd, 0 /* flag */);
+    close(inner_map_fd); // Important!
+
+    __u32 inner_map_id;
+    bpf_map_lookup_elem(outer_map_fd, &outer_key, &inner_map_id);
+    inner_map_fd = bpf_map_get_fd_by_id(inner_map_id);
+    __u32 inner_value = 700; // policy_id
+    policy_map_key_t inner_key = {
+        .remote_pod_label_id = 123,
+        .direction = EGRESS,
+        .remote_port = 443,
+    };
+    __u32 lookedup_val;
+    bpf_map_update_elem(inner_map_fd, &inner_key, &inner_value, 0);
+    bpf_map_lookup_elem(inner_map_fd, &inner_key, &lookedup_val);
+    printf("looked up policy id %d in inner map", lookedup_val);
+    // ... Use inner_value;
+    close(inner_map_fd); // Important!
+
+
+
+    // if (map_policy_maps_obj == NULL)
+    // {
+    //     printf("global policy map is null\n");
+    //     return _npm_endpoint_prog_t;
+    // }
+
+    // int err = pin_given_map(GLOBAL_POLICY_MAP, bpf_map__fd(map_policy_maps_obj));
+    // if (err < 0)
+    // {
+    //     printf("Failed to pin GLOBAL POLICY MAP\n");
+    //     return _npm_endpoint_prog_t;
+    // }
+    // printf("DONE pinning GLOBAL POLICY MAP\n");
+
+    // struct bpf_map *ip_cache_map_obj = bpf_object__find_map_by_name(object, "ip_cache_map");
+    // if (ip_cache_map_obj == NULL)
+    // {
+    //     printf("ip cache map is null\n");
+    //     return _npm_endpoint_prog_t;
+    // }
 
     // err = pin_given_map(IP_CACHE_MAP, bpf_map__fd(ip_cache_map_obj));
     // if (err < 0)
@@ -382,20 +438,23 @@ int update_global_policy_map(int compartment_id)
     // }
     // return 0;
     
+
+    // mine
     // char * comp_map_name = malloc(sizeof(char) * 12); // policy_mapX + '\0'
     // strcpy(comp_map_name, "policy_map");
-    const char* outer_map_name = "outer_map";
-    struct bpf_map* outer_map = bpf_object__find_map_by_name(obj, outer_map_name);
-    int inner_map_fd = bpf_create_map_name(
-        BPF_MAP_TYPE_HASH,   // type
-        "policy_map_3", // name
-        sizeof(__u32),       // key_size
-        sizeof(__u32),       // value_size
-        8,                   // max_entries
-        0);                  // flag
-    __u32 outer_key = 3;
-    bpf_map_update_elem(outer_map_fd, &outer_key, &inner_map_fd, 0 /* flag */);
-    close(inner_map_fd); // Important!
+    // const char* outer_map_name = "outer_map";
+    // struct bpf_map* outer_map = bpf_object__find_map_by_name(obj, outer_map_name);
+    // int inner_map_fd = bpf_create_map_name(
+    //     BPF_MAP_TYPE_HASH,   // type
+    //     "policy_map_3", // name
+    //     sizeof(__u32),       // key_size
+    //     sizeof(__u32),       // value_size
+    //     8,                   // max_entries
+    //     0);                  // flag
+    // __u32 outer_key = 3;
+    // bpf_map_update_elem(outer_map_fd, &outer_key, &inner_map_fd, 0 /* flag */);
+    // close(inner_map_fd); // Important!
+    return 0;
 }
 
 int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint16_t remote_port, int compartment_id, int policy_id, bool delete)

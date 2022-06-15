@@ -139,7 +139,7 @@ func test_scenario(srcID, dstID int) int {
 		}
 	}
 
-	retCode := C.update_global_policy_map(C.int(srcID))
+	//retCode := C.update_global_policy_map(C.int(srcID))
 	// if retCode < 0 {
 	// 	fmt.Println("Error: Could not get comp map fd")
 	// 	return -1
@@ -155,13 +155,13 @@ func test_scenario(srcID, dstID int) int {
 	// say compID is the frontend pod
 
 	// here we have compartment ID
-	gupdate_comp_policy_map(200, 443, 700, srcID, INGRESS, false) // allow ingress to frontend from anywhere on port 443
-	gupdate_comp_policy_map(200, 53, 700, srcID, EGRESS, false)   // allow egress from frontend to anywhere on port 53
-	gupdate_comp_policy_map(123, 0, 700, srcID, EGRESS, false)    // allow egress to backend (map above)
+	// gupdate_comp_policy_map(200, 443, 700, srcID, INGRESS, false) // allow ingress to frontend from anywhere on port 443
+	// gupdate_comp_policy_map(200, 53, 700, srcID, EGRESS, false)   // allow egress from frontend to anywhere on port 53
+	// gupdate_comp_policy_map(123, 0, 700, srcID, EGRESS, false)    // allow egress to backend (map above)
 
-	gupdate_comp_policy_map(789, 443, 700, dstID, INGRESS, false) // allow ingress from frontend on port 443
-	//temp - todo delete
-	gupdate_comp_policy_map(1, 2, 666, dstID, INGRESS, false)
+	// gupdate_comp_policy_map(789, 443, 700, dstID, INGRESS, false) // allow ingress from frontend on port 443
+	// //temp - todo delete
+	// gupdate_comp_policy_map(1, 2, 666, dstID, INGRESS, false)
 
 	// need compartment policy map
 	// create if doesn't exist policy map corresponding to frontendpolicy
