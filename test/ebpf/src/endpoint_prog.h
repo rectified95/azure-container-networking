@@ -14,10 +14,16 @@ typedef enum direction
 typedef struct policy_map_key
 {
     uint32_t remote_pod_label_id;
-    // uint8_t protocol;  by default, we are using TCP protocol
     uint8_t direction;
     uint16_t remote_port;
+    uint8_t protocol; // by default, we are using TCP protocol
 } policy_map_key_t;
+
+typedef struct tail_cache_val
+{
+    uint32_t remote_label;
+    uint8_t direction;
+} tail_cache_val_t;
 
 typedef struct ip_address
 {

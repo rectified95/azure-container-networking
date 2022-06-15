@@ -75,8 +75,8 @@ func main() {
 	// backend compid is 8
 	// database compid is 4
 
-	frontendID := 3
-	backendID := 8
+	frontendID := 2
+	backendID := 4
 
 	// attach to frontend endpoint id
 	reErr := C.attach_progs_to_compartment(winState.epprog, C.int(frontendID))
@@ -110,7 +110,8 @@ func initialize() (*WinEbpfState, int) {
 		return nil, RET_ERR
 	}
 
-	fmt.Println("%+v", r.connect4_program)
+	fmt.Println("%+v", r.connect4_0_program)
+	fmt.Println("%+v", r.connect4_1_program)
 
 	fmt.Print("Done loading progs")
 	fmt.Println(r)
@@ -123,10 +124,9 @@ func initialize() (*WinEbpfState, int) {
 func test_scenario(srcID, dstID int) int {
 
 	iptoid := map[string]uint32{
-		"10.240.0.47": 123, // backend
-		"10.240.0.45": 456, // database
-		"10.240.0.39": 789, // frontend
-		"10.10.10.10": 10,  //joke
+		"10.240.0.56": 123, // backend
+		"10.240.0.44": 456, // database
+		"10.240.0.36": 789, // frontend
 	}
 
 	for ip, id := range iptoid {
@@ -157,11 +157,8 @@ func test_scenario(srcID, dstID int) int {
 	// here we have compartment ID
 	gupdate_comp_policy_map(200, 443, 700, srcID, INGRESS, false) // allow ingress to frontend from anywhere on port 443
 	gupdate_comp_policy_map(200, 53, 700, srcID, EGRESS, false)   // allow egress from frontend to anywhere on port 53
-	gupdate_comp_policy_map(123, 0, 700, srcID, EGRESS, false)    // allow egress to backend (map above)
-
+	gupdate_comp_policy_map(123, 443, 700, srcID, EGRESS, false)    // allow egress to backend (map above)
 	gupdate_comp_policy_map(789, 443, 700, dstID, INGRESS, false) // allow ingress from frontend on port 443
-	//temp - todo delete
-	gupdate_comp_policy_map(1, 2, 666, dstID, INGRESS, false)
 
 	// need compartment policy map
 	// create if doesn't exist policy map corresponding to frontendpolicy
