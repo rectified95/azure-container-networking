@@ -362,7 +362,7 @@ int update_global_policy_map(int compartment_id)
         return -1;
     }
 
-    printf("Updating comp policy map\n");
+    printf("Retrieving global policy map\n");
     fd_t global_policy_map_fd = get_map_fd(GLOBAL_POLICY_MAP, 0);
     if (global_policy_map_fd == INVALID_MAP_FD)
     {
@@ -371,6 +371,7 @@ int update_global_policy_map(int compartment_id)
 
     // Update the global policy map
     int error = bpf_map_update_elem(global_policy_map_fd, &compartment_id, &compartment_policy_map_fd, BPF_ANY);
+    printf("updated global policy map: com_id %d comp_map_fd %d", compartment_id, compartment_policy_map_fd);
     if (error != 0)
     {
         printf("Error while updating global policy map\n");

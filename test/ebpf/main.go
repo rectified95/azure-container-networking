@@ -160,6 +160,8 @@ func test_scenario(srcID, dstID int) int {
 	gupdate_comp_policy_map(123, 0, 700, srcID, EGRESS, false)    // allow egress to backend (map above)
 
 	gupdate_comp_policy_map(789, 443, 700, dstID, INGRESS, false) // allow ingress from frontend on port 443
+	//temp - todo delete
+	gupdate_comp_policy_map(1, 2, 666, dstID, INGRESS, false)
 
 	// need compartment policy map
 	// create if doesn't exist policy map corresponding to frontendpolicy
