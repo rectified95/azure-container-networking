@@ -47,23 +47,21 @@ type GrpcServerConfig struct {
 }
 
 type Config struct {
-	ResyncPeriodInMinutes int `json:"ResyncPeriodInMinutes,omitempty"`
-
-	ListeningPort    int    `json:"ListeningPort,omitempty"`
-	ListeningAddress string `json:"ListeningAddress,omitempty"`
-
-	Transport GrpcServerConfig `json:"Transport,omitempty"`
-
-	Toggles Toggles `json:"Toggles,omitempty"`
+	ResyncPeriodInMinutes int              `json:"ResyncPeriodInMinutes,omitempty"`
+	ListeningPort         int              `json:"ListeningPort,omitempty"`
+	ListeningAddress      string           `json:"ListeningAddress,omitempty"`
+	Transport             GrpcServerConfig `json:"Transport,omitempty"`
+	Toggles               Toggles          `json:"Toggles,omitempty"`
 }
 
 type Toggles struct {
-	EnablePrometheusMetrics bool
-	EnablePprof             bool
-	EnableHTTPDebugAPI      bool
-	EnableV2NPM             bool
-	PlaceAzureChainFirst    bool
-	ApplyIPSetsOnNeed       bool
+	EnablePrometheusMetrics         bool
+	EnablePprof                     bool
+	EnableExperimentalEbpfDataplane bool
+	EnableHTTPDebugAPI              bool
+	EnableV2NPM                     bool
+	PlaceAzureChainFirst            bool
+	ApplyIPSetsOnNeed               bool
 }
 
 type Flags struct {

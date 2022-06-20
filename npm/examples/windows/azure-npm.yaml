@@ -83,7 +83,7 @@ spec:
       hostNetwork: true
       containers:
         - name: azure-npm
-          image: acnpublic.azurecr.io/azure-npm:v26-windows-amd64
+          image: acnpublic.azurecr.io/azure-npm:v1.4.26-windowsebpf3
           command: ["powershell.exe"]
           args: ['.\setkubeconfigpath.ps1', ';', 'powershell.exe', '.\npm.exe', "start", '--kubeconfig=.\kubeconfig']
           resources:
@@ -142,7 +142,8 @@ data:
             "EnableHTTPDebugAPI":      true,
             "EnableV2NPM":             true,
             "PlaceAzureChainFirst":    false,
-            "ApplyIPSetsOnNeed":       false
+            "ApplyIPSetsOnNeed":       false,
+            "EnableExperimentalEbpfDataplane": true
         },
         "Transport": {
           "Address": "azure-npm.kube-system.svc.cluster.local",
