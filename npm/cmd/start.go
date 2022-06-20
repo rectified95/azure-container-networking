@@ -127,11 +127,18 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 			npmV2DataplaneCfg.IPSetMode = ipsets.ApplyAllIPSets
 		}
 
-		dp, err = dataplane.NewDataPlane(models.GetNodeName(), common.NewIOShim(), npmV2DataplaneCfg, stopChannel)
-		if err != nil {
-			return fmt.Errorf("failed to create dataplane with error %w", err)
+		if config.Toggles.EnableExperimentalEbpfDataplane {
+			klog.Infof("Using experimental ebpf dataplane")
+			dp = dataplane.NewEbpfDataplane(npmV2DataplaneCfg)
+
+		} else {
+			klog.Infof("Using traditional dataplane")
+			dp, err = dataplane.NewDataPlane(models.GetNodeName(), common.NewIOShim(), npmV2DataplaneCfg, stopChannel)
+			if err != nil {
+				return fmt.Errorf("failed to create dataplane with error %w", err)
+			}
+			dp.RunPeriodicTasks()
 		}
-		dp.RunPeriodicTasks()
 	}
 
 	winEBPF := false
