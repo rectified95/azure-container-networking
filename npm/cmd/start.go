@@ -55,7 +55,6 @@ func newStartNPMCmd() *cobra.Command {
 
 			flags := npmconfig.Flags{
 				KubeConfigPath: viper.GetString(flagKubeConfigPath),
-				WinEbpf: viper.GetString(flagWinWbpf),
 			}
 
 			return start(*config, flags)
@@ -63,7 +62,6 @@ func newStartNPMCmd() *cobra.Command {
 	}
 
 	startNPMCmd.Flags().String(flagKubeConfigPath, flagDefaults[flagKubeConfigPath], "path to kubeconfig")
-	startNPMCmd.Flags().String(flagWinWbpf, flagDefaults[flagWinWbpf], "if windows ebpf")
 
 	return startNPMCmd
 }
@@ -127,26 +125,13 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 			npmV2DataplaneCfg.IPSetMode = ipsets.ApplyAllIPSets
 		}
 
-		if config.Toggles.EnableExperimentalEbpfDataplane {
-			klog.Infof("Using experimental ebpf dataplane")
-			dp = dataplane.NewEbpfDataplane(npmV2DataplaneCfg)
-
-		} else {
-			klog.Infof("Using traditional dataplane")
-			dp, err = dataplane.NewDataPlane(models.GetNodeName(), common.NewIOShim(), npmV2DataplaneCfg, stopChannel)
-			if err != nil {
-				return fmt.Errorf("failed to create dataplane with error %w", err)
-			}
-			dp.RunPeriodicTasks()
+		dp, err = dataplane.NewDataPlane(models.GetNodeName(), common.NewIOShim(), npmV2DataplaneCfg, stopChannel)
+		if err != nil {
+			return fmt.Errorf("failed to create dataplane with error %w", err)
 		}
+		dp.RunPeriodicTasks()
 	}
-
-	winEBPF := false
-
-	if flags.WinEbpf != "" {
-		winEBPF = true
-	}
-	npMgr := npm.NewNetworkPolicyManager(config, factory, dp, exec.New(), version, k8sServerVersion, winEBPF)
+	npMgr := npm.NewNetworkPolicyManager(config, factory, dp, exec.New(), version, k8sServerVersion)
 	err = metrics.CreateTelemetryHandle(config.NPMVersion(), version, npm.GetAIMetadata())
 	if err != nil {
 		klog.Infof("CreateTelemetryHandle failed with error %v. AITelemetry is not initialized.", err)
@@ -166,7 +151,7 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 func initLogging() error {
 	log.SetName("azure-npm")
 	log.SetLevel(log.LevelInfo)
-	if err := log.SetTargetLogDirectory(log.TargetStdout, ""); err != nil {
+	if err := log.SetTargetLogDirectory(log.TargetStdOutAndLogFile, ""); err != nil {
 		log.Logf("Failed to configure logging, err:%v.", err)
 		return fmt.Errorf("%w", err)
 	}
