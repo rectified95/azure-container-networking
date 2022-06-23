@@ -95,7 +95,7 @@ int pin_given_map(int internal_map_type, fd_t fd)
 struct npm_endpoint_prog_t test_ebpf_prog()
 {
     const char *connect4_0_program_name = "authorize_connect4_0";
-    const char *connect4_1_program_name = "authorize_connect4_1";
+    const char *policy_eval_program__name = "policy_eval_prog";
 
     const char *connect6_program_name = "authorize_connect6";
     const char *recv4_accept_program_name = "authorize_recv_accept4";
@@ -132,25 +132,22 @@ struct npm_endpoint_prog_t test_ebpf_prog()
         return _npm_endpoint_prog_t;
     }
 
-    printf("Getting the bpf_prog for connect program 4_1\n");
-    struct bpf_program *connect_1_program = bpf_object__find_program_by_name(object, connect4_1_program_name);
-    if (!connect_1_program)
+    printf("Getting the bpf_prog for policy_eval program\n");
+    struct bpf_program *policy_eval_program = bpf_object__find_program_by_name(object, policy_eval_program__name);
+    if (!policy_eval_program)
     {
-        printf("%s is null\n", connect4_1_program_name);
+        printf("%s is null\n", policy_eval_program__name);
         return _npm_endpoint_prog_t;
     }
+
     _npm_endpoint_prog_t.connect4_0_program = connect_0_program;
-    _npm_endpoint_prog_t.connect4_1_program = connect_1_program;
-    fd_t callee0_fd = bpf_program__fd(connect_0_program);
-    fd_t callee1_fd = bpf_program__fd(connect_1_program);
-    printf("connect_0_fd %d; connect_1_fd %d", callee0_fd, callee1_fd);
+    _npm_endpoint_prog_t.policy_eval_program = policy_eval_program;
+    fd_t callee1_fd = bpf_program__fd(policy_eval_program);
     fd_t prog_map_fd = bpf_object__find_map_fd_by_name(object, "prog_array_map");
-    uint32_t index = 1;//0;
-    //bpf_map_update_elem(prog_map_fd, &index, &callee0_fd, 0);
-    //index = 1;
+    uint32_t index = 1;
     bpf_map_update_elem(prog_map_fd, &index, &callee1_fd, 0);
-    printf("callee_0 close res %d", _close(callee0_fd));
     printf("callee_1 close res %d", _close(callee1_fd));
+
     printf("connect program \n");
 
     struct bpf_program *connect6_program = bpf_object__find_program_by_name(object, connect6_program_name);
@@ -228,7 +225,7 @@ int attach_progs(struct npm_endpoint_prog_t npm_ep)
         printf("Error is null while attaching v4_0 connect prog\n");
         return result;
     }
-    result = bpf_prog_attach(bpf_program__fd(npm_ep.connect4_1_program), 0, BPF_CGROUP_INET4_CONNECT, 0);
+    result = bpf_prog_attach(bpf_program__fd(npm_ep.policy_eval_program), 0, BPF_CGROUP_INET4_CONNECT, 0);
     if (result != 0)
     {
         printf("Error is null while attaching v4_1 connect prog\n");
@@ -269,7 +266,7 @@ int attach_progs_to_compartment(struct npm_endpoint_prog_t npm_ep, int compartme
     printf("attach V4 connect prog\n");
     // attach V4 connect prog
     fd_t connect_0_fd = bpf_program__fd(npm_ep.connect4_0_program);
-    fd_t connect_1_fd = bpf_program__fd(npm_ep.connect4_1_program);
+    fd_t connect_1_fd = bpf_program__fd(npm_ep.policy_eval_program);
     //printf("connect_0_fd %d; connect_1_fd %d", connect_0_fd, connect_1_fd);
     int result = bpf_prog_attach(connect_0_fd, compartment_id, BPF_CGROUP_INET4_CONNECT, 0);
     if (result != 0)
