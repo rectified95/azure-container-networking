@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"runtime/debug"
 
 	"github.com/spf13/cobra"
@@ -14,12 +15,12 @@ import (
 const (
 	flagVersion        = "version"
 	flagKubeConfigPath = "kubeconfig"
-	flagWinWbpf = "ebpf"
+	flagWinWbpf        = "ebpf"
 )
 
 var flagDefaults = map[string]string{
 	flagKubeConfigPath: "",
-	flagWinWbpf: "",
+	flagWinWbpf:        "",
 }
 
 // Version is populated by make during build.
@@ -33,8 +34,14 @@ func panicRecoverAndExitWithStackTrace() {
 	}
 }
 
+func init() {
+	fmt.Println("test")
+}
+
 func main() {
 	defer panicRecoverAndExitWithStackTrace()
+
+	fmt.Println("starting")
 
 	rootCmd := NewRootCmd()
 

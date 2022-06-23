@@ -6,6 +6,7 @@ import (
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
 	"github.com/Azure/azure-container-networking/npm/util"
+	ebpftest "github.com/Azure/azure-container-networking/test/ebpf"
 )
 
 type EbpfDataplane struct{}
@@ -16,6 +17,8 @@ func NewEbpfDataplane(config *Config) *EbpfDataplane {
 
 func (e *EbpfDataplane) BootupDataplane() error {
 	log.Printf("[ebpf] BootupDataplane")
+
+	ebpftest.RunProgram()
 	return nil
 }
 
