@@ -76,6 +76,7 @@ func main() {
 	// database compid is 4
 
 	frontendID := 2
+	databaseID := 3
 	backendID := 4
 
 	// attach to frontend endpoint id
@@ -88,6 +89,12 @@ func main() {
 	reErr = C.attach_progs_to_compartment(winState.epprog, C.int(backendID))
 	if reErr < 0 {
 		fmt.Println("Failed while attaching prog to compartment %v with err %v", backendID, reErr)
+		return
+	}
+
+	reErr = C.attach_progs_to_compartment(winState.epprog, C.int(databaseID))
+	if reErr < 0 {
+		fmt.Println("Failed while attaching prog to compartment %v with err %v", databaseID, reErr)
 		return
 	}
 
@@ -111,7 +118,7 @@ func initialize() (*WinEbpfState, int) {
 	}
 
 	fmt.Println("%+v", r.connect4_0_program)
-	fmt.Println("%+v", r.connect4_1_program)
+	fmt.Println("%+v", r.policy_eval_program)
 
 	fmt.Print("Done loading progs")
 	fmt.Println(r)
@@ -151,14 +158,24 @@ func test_scenario(srcID, dstID int) int {
 		return -1
 	}
 
+	retCode = C.update_global_policy_map(C.int(3))
+	if retCode < 0 {
+		fmt.Println("Error: Could not get comp map fd")
+		return -1
+	}
+
 	// manually creating frotendpolicy id to 700
+	// manually creating db policy with id 666
 	// say compID is the frontend pod
 
-	// here we have compartment ID
 	gupdate_comp_policy_map(200, 443, 700, srcID, INGRESS, false) // allow ingress to frontend from anywhere on port 443
 	gupdate_comp_policy_map(200, 53, 700, srcID, EGRESS, false)   // allow egress from frontend to anywhere on port 53
-	gupdate_comp_policy_map(123, 443, 700, srcID, EGRESS, false)    // allow egress to backend (map above)
-	gupdate_comp_policy_map(789, 443, 700, dstID, INGRESS, false) // allow ingress from frontend on port 443
+	gupdate_comp_policy_map(123, 443, 700, srcID, EGRESS, false)  // allow egress from frontend to backend on port 443 (map above)
+
+	gupdate_comp_policy_map(789, 443, 700, dstID, INGRESS, false) // allow ingress from frontend to backend on port 443
+
+	gupdate_comp_policy_map(123, 443, 666, 3, INGRESS, false) // allow ingress from backend to db 
+	gupdate_comp_policy_map(456, 443, 666, dstID, EGRESS, false) // allow egress from backend to db
 
 	// need compartment policy map
 	// create if doesn't exist policy map corresponding to frontendpolicy
