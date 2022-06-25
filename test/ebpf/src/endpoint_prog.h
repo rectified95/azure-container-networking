@@ -21,8 +21,7 @@ typedef struct policy_map_key
 
 typedef struct tail_cache_val
 {
-    uint32_t remote_label;
-    uint8_t direction;
+    policy_map_key_t lookup_key;
 } tail_cache_val_t;
 
 typedef struct ip_address
