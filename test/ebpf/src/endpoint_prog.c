@@ -55,21 +55,14 @@ _policy_eval(bpf_sock_addr_t *ctx)
 {
     bpf_sock_addr_t ctx_cpy = *ctx;
     tail_cache_val_t* cache_val = (tail_cache_val_t*) bpf_map_lookup_elem(&tail_call_state_cache, &ctx_cpy);
-    uint32_t comp_id = ctx->compartment_id;
-   
     if (!cache_val) {
         return BPF_SOCK_ADDR_VERDICT_REJECT;
     }
 
-    policy_map_key_t key = {0};
-    key.remote_pod_label_id = cache_val->remote_label;
-    key.remote_port = ctx->user_port;
-    key.protocol = 0;
-    key.direction = cache_val->direction;
-    
+    policy_map_key_t key = cache_val->lookup_key;
+    uint32_t comp_id = ctx->compartment_id;
+   
     bpf_map_delete_elem(&tail_call_state_cache, &ctx_cpy);
-    
-    //bpf_printk("Looking up policy map for comp_id %d\n", ctx->compartment_id);
 
     void *policy_map_id = (uint32_t *)bpf_map_lookup_elem(&map_policy_maps, &comp_id);
     if (policy_map_id == NULL)
@@ -85,27 +78,22 @@ _policy_eval(bpf_sock_addr_t *ctx)
     //     key.remote_pod_label_id, key.remote_port, key.direction);  
 
     // Look up L4 first 
-    bpf_printk("comp_id %d, ", comp_id);
     uint32_t *verdict = bpf_map_lookup_elem(policy_map_id, &key);
     if (verdict != NULL)
     {
-        // bpf_printk("Policy Eval: L4 policy ID %lu Allowed, remote_pod_label %d.", 
-        //     *verdict, key.remote_pod_label_id);
-        bpf_printk("found policy\n");
+        bpf_printk("Policy Eval: L4 policy ID %lu Allowed, remote_pod_label %d.", 
+            *verdict, key.remote_pod_label_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
 
-    // bpf_printk("No L4 rules found for labelid: %d, direction: %d, remote port: %d\n", 
-    //     key.remote_pod_label_id, key.direction, key.remote_port);
-
     // // Look up L3 rules
-    // key.remote_port = 0;
-    // verdict = bpf_map_lookup_elem(policy_map_id, &key);
-    // if (verdict != NULL)
-    // {
-    //     bpf_printk("Policy Eval: L3 policy ID %lu Allowed.", *verdict);
-    //     return BPF_SOCK_ADDR_VERDICT_PROCEED;
-    // }
+    key.remote_port = 0;
+    verdict = bpf_map_lookup_elem(policy_map_id, &key);
+    if (verdict != NULL)
+    {
+        bpf_printk("Policy Eval: L3 policy ID %lu Allowed.", *verdict);
+        return BPF_SOCK_ADDR_VERDICT_PROCEED;
+    }
 
     // bpf_printk("no L3 rules found for labelid: %d, direction: %d, remote port: %d\n", 
     //         key.remote_pod_label_id, key.direction, key.remote_port);
@@ -145,10 +133,14 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
     
-    tail_cache_val_t cache = {0};
-    cache.direction = dir;
-    cache.remote_label = *ctx_label_id;
+    policy_map_key_t key = {0};
+    key.remote_pod_label_id = *ctx_label_id;
+    key.remote_port = ctx->user_port;
+    key.protocol = 0;
+    key.direction = dir;
 
+    tail_cache_val_t cache = {0};
+    cache.lookup_key = key;
     bpf_sock_addr_t ctx_cpy = *ctx;
 
     bpf_map_update_elem(&tail_call_state_cache, &ctx_cpy, &cache, 0);
