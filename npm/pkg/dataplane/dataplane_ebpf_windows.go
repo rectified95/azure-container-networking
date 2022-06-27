@@ -12,7 +12,10 @@ import (
 type EbpfDataplane struct{}
 
 func NewEbpfDataplane(config *Config) *EbpfDataplane {
-	return &EbpfDataplane{}
+	log.Printf("starting dataplane")
+	dp := &EbpfDataplane{}
+	dp.BootupDataplane()
+	return dp
 }
 
 func (e *EbpfDataplane) BootupDataplane() error {
@@ -38,6 +41,9 @@ func (e *EbpfDataplane) GetIPSet(setName string) *ipsets.IPSet {
 
 func (e *EbpfDataplane) CreateIPSets(setMetadatas []*ipsets.IPSetMetadata) {
 	log.Printf("[ebpf] CreateIPSets: %+v", setMetadatas)
+	for _, metadata := range setMetadatas {
+		log.Printf("\t set metadata: %+v\n", metadata)
+	}
 }
 
 func (e *EbpfDataplane) DeleteIPSet(setMetadata *ipsets.IPSetMetadata, deleteOption util.DeleteOption) {
@@ -45,22 +51,35 @@ func (e *EbpfDataplane) DeleteIPSet(setMetadata *ipsets.IPSetMetadata, deleteOpt
 }
 
 func (e *EbpfDataplane) AddToSets(setMetadatas []*ipsets.IPSetMetadata, podMetadata *PodMetadata) error {
-	log.Printf("[ebpf] AddToSets: %+v, %+v", setMetadatas, podMetadata)
+	log.Printf("[ebpf] AddToSets: pod %+v, %+v", setMetadatas, podMetadata)
+	for _, metadata := range setMetadatas {
+		log.Printf("\t set metadata: %+v\n", metadata)
+	}
+
 	return nil
 }
 
 func (e *EbpfDataplane) RemoveFromSets(setMetadatas []*ipsets.IPSetMetadata, podMetadata *PodMetadata) error {
 	log.Printf("[ebpf] RemoveFromSets: %+v, %+v", setMetadatas, podMetadata)
+	for _, metadata := range setMetadatas {
+		log.Printf("\t set metadata: %+v\n", metadata)
+	}
 	return nil
 }
 
 func (e *EbpfDataplane) AddToLists(listMetadatas []*ipsets.IPSetMetadata, setMetadatas []*ipsets.IPSetMetadata) error {
 	log.Printf("[ebpf] AddToLists: %+v, %+v", listMetadatas, setMetadatas)
+	for _, metadata := range setMetadatas {
+		log.Printf("\t list metadata: %+v\n", metadata)
+	}
 	return nil
 }
 
 func (e *EbpfDataplane) RemoveFromList(listMetadata *ipsets.IPSetMetadata, setMetadatas []*ipsets.IPSetMetadata) error {
 	log.Printf("[ebpf] RemoveFromList: %+v, %+v", listMetadata, setMetadatas)
+	for _, metadata := range setMetadatas {
+		log.Printf("\t set metadata: %+v\n", metadata)
+	}
 	return nil
 }
 

@@ -41,6 +41,7 @@ func NewWinEbfState(epprog C.struct_npm_endpoint_prog_t) *WinEbpfState {
 }
 
 func RunProgram() {
+	fmt.Println("starting ebpf program")
 
 	ioShim := common.NewIOShim()
 
