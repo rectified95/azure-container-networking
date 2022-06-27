@@ -131,11 +131,17 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 			npmV2DataplaneCfg.IPSetMode = ipsets.ApplyAllIPSets
 		}
 
-		dp, err = dataplane.NewDataPlane(models.GetNodeName(), common.NewIOShim(), npmV2DataplaneCfg, stopChannel)
-		if err != nil {
-			return fmt.Errorf("failed to create dataplane with error %w", err)
+		if config.Toggles.EnableExperimentalEbpfDataplane {
+			log.Logf("using ebpf dataplane")
+			dp = dataplane.NewEbpfDataplane(npmV2DataplaneCfg)
+		} else {
+			dp, err = dataplane.NewDataPlane(models.GetNodeName(), common.NewIOShim(), npmV2DataplaneCfg, stopChannel)
+			if err != nil {
+				return fmt.Errorf("failed to create dataplane with error %w", err)
+			}
+			dp.RunPeriodicTasks()
 		}
-		dp.RunPeriodicTasks()
+
 	}
 	npMgr := npm.NewNetworkPolicyManager(config, factory, dp, exec.New(), version, k8sServerVersion)
 	err = metrics.CreateTelemetryHandle(config.NPMVersion(), version, npm.GetAIMetadata())
