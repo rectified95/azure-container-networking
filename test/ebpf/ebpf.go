@@ -29,6 +29,8 @@ const (
 	AzureNetworkName           = "azure"
 )
 
+var winEbpfState *WinEbpfState
+
 type WinEbpfState struct {
 	epprog      C.struct_npm_endpoint_prog_t
 	podMetadata map[string]int
@@ -40,7 +42,7 @@ func NewWinEbfState(epprog C.struct_npm_endpoint_prog_t) *WinEbpfState {
 	}
 }
 
-func RunProgram() {
+func InitializeEbpfState() {
 	fmt.Println("starting ebpf program")
 
 	ioShim := common.NewIOShim()
@@ -68,6 +70,8 @@ func RunProgram() {
 		fmt.Println("Failed to initialize WinEbpfState")
 	}
 
+	winEbpfState = winState
+
 	// 85-testing cluster
 	// block all traffic on pod with IP 10.240.0.47
 	// "CompartmendId":  3,
@@ -76,37 +80,47 @@ func RunProgram() {
 	// backend compid is 8
 	// database compid is 4
 
-	frontendID := 2
-	databaseID := 3
-	backendID := 4
+	/*
+		frontendID := 2
+		databaseID := 3
+		backendID := 4
 
-	// attach to frontend endpoint id
-	reErr := C.attach_progs_to_compartment(winState.epprog, C.int(frontendID))
+		// attach to frontend endpoint id
+		reErr := C.attach_progs_to_compartment(winState.epprog, C.int(frontendID))
+		if reErr < 0 {
+			fmt.Println("Failed while attaching prog to compartment %v with err %v", frontendID, reErr)
+			return
+		}
+
+		reErr = C.attach_progs_to_compartment(winState.epprog, C.int(backendID))
+		if reErr < 0 {
+			fmt.Println("Failed while attaching prog to compartment %v with err %v", backendID, reErr)
+			return
+		}
+
+		reErr = C.attach_progs_to_compartment(winState.epprog, C.int(databaseID))
+		if reErr < 0 {
+			fmt.Println("Failed while attaching prog to compartment %v with err %v", databaseID, reErr)
+			return
+		}
+
+		fmt.Println("running our scenario")
+		res1 := test_scenario(frontendID, backendID)
+		if res1 < 0 {
+
+			fmt.Println("Failed while running scenario")
+			return
+		}
+	*/
+}
+
+func AttachProgsToCompartment(id int) error {
+	reErr := C.attach_progs_to_compartment(winEbpfState.epprog, C.int(id))
 	if reErr < 0 {
-		fmt.Println("Failed while attaching prog to compartment %v with err %v", frontendID, reErr)
-		return
+		fmt.Println("Failed while attaching prog to compartment %v with err %v", id, reErr)
+		return fmt.Errorf("Failed while attaching prog to compartment %v with err %v", id, reErr)
 	}
-
-	reErr = C.attach_progs_to_compartment(winState.epprog, C.int(backendID))
-	if reErr < 0 {
-		fmt.Println("Failed while attaching prog to compartment %v with err %v", backendID, reErr)
-		return
-	}
-
-	reErr = C.attach_progs_to_compartment(winState.epprog, C.int(databaseID))
-	if reErr < 0 {
-		fmt.Println("Failed while attaching prog to compartment %v with err %v", databaseID, reErr)
-		return
-	}
-
-	fmt.Println("running our scenario")
-	res1 := test_scenario(frontendID, backendID)
-	if res1 < 0 {
-
-		fmt.Println("Failed while running scenario")
-		return
-	}
-
+	return nil
 }
 
 func initialize() (*WinEbpfState, int) {
@@ -127,6 +141,16 @@ func initialize() (*WinEbpfState, int) {
 	state := NewWinEbfState(r)
 
 	return state, 0
+}
+
+func UpdateIPCacheMap(ip string, id int) int {
+	tempip := net.ParseIP(ip)
+	err := gupdate_ip_cache(uint32(id), tempip, false)
+	if err != 0 {
+		fmt.Println("Error: Could not add to ip cache")
+		return -1
+	}
+	return 0
 }
 
 func test_scenario(srcID, dstID int) int {
@@ -169,14 +193,14 @@ func test_scenario(srcID, dstID int) int {
 	// manually creating db policy with id 666
 	// say compID is the frontend pod
 
-	gupdate_comp_policy_map(200, 443, 700, srcID, INGRESS, false) // allow ingress to frontend from anywhere on port 443
-	gupdate_comp_policy_map(200, 53, 700, srcID, EGRESS, false)   // allow egress from frontend to anywhere on port 53
-	gupdate_comp_policy_map(123, 443, 700, srcID, EGRESS, false)  // allow egress from frontend to backend on port 443 (map above)
+	Gupdate_comp_policy_map(200, 443, 700, srcID, INGRESS, false) // allow ingress to frontend from anywhere on port 443
+	Gupdate_comp_policy_map(200, 53, 700, srcID, EGRESS, false)   // allow egress from frontend to anywhere on port 53
+	Gupdate_comp_policy_map(123, 443, 700, srcID, EGRESS, false)  // allow egress from frontend to backend on port 443 (map above)
 
-	gupdate_comp_policy_map(789, 443, 700, dstID, INGRESS, false) // allow ingress from frontend to backend on port 443
+	Gupdate_comp_policy_map(789, 443, 700, dstID, INGRESS, false) // allow ingress from frontend to backend on port 443
 
-	gupdate_comp_policy_map(123, 443, 666, 3, INGRESS, false) // allow ingress from backend to db 
-	gupdate_comp_policy_map(456, 443, 666, dstID, EGRESS, false) // allow egress from backend to db
+	Gupdate_comp_policy_map(123, 443, 666, 3, INGRESS, false)    // allow ingress from backend to db
+	Gupdate_comp_policy_map(456, 443, 666, dstID, EGRESS, false) // allow egress from backend to db
 
 	// need compartment policy map
 	// create if doesn't exist policy map corresponding to frontendpolicy
@@ -192,7 +216,7 @@ func test_scenario(srcID, dstID int) int {
 	return 0
 }
 
-func gupdate_comp_policy_map(remote_label_id, remote_port, policy_id, compartment_id int, dir direction, delete bool) int {
+func Gupdate_comp_policy_map(remote_label_id, remote_port, policy_id, compartment_id int, dir direction, delete bool) int {
 	fmt.Printf("Updating comp policy map with remote label: %d, remote port: %d, policy id: %d, compartment id: %d, direction: %s\n", remote_label_id, remote_port, policy_id, compartment_id, dir)
 	res := C.update_comp_policy_map(
 		C.int(remote_label_id),
