@@ -120,6 +120,12 @@ func AttachProgsToCompartment(id int) error {
 		fmt.Println("Failed while attaching prog to compartment %v with err %v", id, reErr)
 		return fmt.Errorf("Failed while attaching prog to compartment %v with err %v", id, reErr)
 	}
+
+	retCode := C.update_global_policy_map(C.int(id))
+	if retCode < 0 {
+		fmt.Println("Error: Could not get comp map fd")
+		return fmt.Errorf("Error: Could not get comp map fd")
+	}
 	return nil
 }
 
@@ -195,8 +201,8 @@ func test_scenario(srcID, dstID int) int {
 
 	Gupdate_comp_policy_map(200, 443, 700, srcID, INGRESS, false) // allow ingress to frontend from anywhere on port 443
 	Gupdate_comp_policy_map(200, 53, 700, srcID, EGRESS, false)   // allow egress from frontend to anywhere on port 53
+	
 	Gupdate_comp_policy_map(123, 443, 700, srcID, EGRESS, false)  // allow egress from frontend to backend on port 443 (map above)
-
 	Gupdate_comp_policy_map(789, 443, 700, dstID, INGRESS, false) // allow ingress from frontend to backend on port 443
 
 	Gupdate_comp_policy_map(123, 443, 666, 3, INGRESS, false)    // allow ingress from backend to db
