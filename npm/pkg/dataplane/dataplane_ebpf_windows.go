@@ -207,7 +207,7 @@ func (e *EbpfDataplane) BootupDataplane() error {
 	log.Printf("[ebpf] BootupDataplane")
 
 	// uncomment this when ready
-	//ebpf.InitializeEbpfState()
+	ebpf.InitializeEbpfState()
 	return nil
 }
 
@@ -254,7 +254,7 @@ func (e *EbpfDataplane) AddToSets(setMetadatas []*ipsets.IPSetMetadata, podMetad
 
 		// attach ebpf program to compartment
 		// uncomment this when ready
-		// ebpf.AttachProgsToCompartment(compartment.CompartmentID)
+		ebpf.AttachProgsToCompartment(compartment.CompartmentID)
 	}
 	return nil
 }
@@ -314,9 +314,9 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 	log.Printf("[ebpf] UpdatePolicy: %+v", policies)
 
 	podnames := []string{
-		"frontend2",
-		"backend2",
-		"database2",
+		"frontend",
+		"backend",
+		"database",
 	}
 
 	policyID := make(map[string]int)
@@ -335,8 +335,8 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 	retrier := Retrier{Attempts: 20, Delay: 1 * time.Second}
 	retrier.Do(context.Background(), ensureAllPodsExist)
 
-	frontendpod, _ := e.GetCompartmentInfoFromPodname("frontend2")
-	backendpod, _ := e.GetCompartmentInfoFromPodname("backend2")
+	frontendpod, _ := e.GetCompartmentInfoFromPodname("frontend")
+	backendpod, _ := e.GetCompartmentInfoFromPodname("backend")
 	//databasepod, _ := e.GetCompartmentInfoFromPodname("database")
 
 	fmt.Printf("UpdatePolicy: frontend: %+v, backend: %+v\n", frontendpod, backendpod)
@@ -352,6 +352,9 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 		ebpf.Gupdate_comp_policy_map(backendpod.EbpfRemoteLabelID, 443, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.EGRESS, false)      // allow egress from frontend to backend on port 443 (map above)
 		ebpf.Gupdate_comp_policy_map(frontendpod.EbpfRemoteLabelID, 443, policyID["frontendpolicy"], backendpod.EbpfRemoteLabelID, ebpf.INGRESS, false) // allow ingress from frontend to backend on port 443
 
+	}
+
+	if strings.Contains(policies.PolicyKey, "backendpolicy") {
 	}
 
 	return nil
