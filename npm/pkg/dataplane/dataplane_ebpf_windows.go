@@ -339,7 +339,7 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 
 	frontendpod, _ := e.GetCompartmentInfoFromPodname("frontend")
 	backendpod, _ := e.GetCompartmentInfoFromPodname("backend")
-	//databasepod, _ := e.GetCompartmentInfoFromPodname("database")
+	databasepod, _ := e.GetCompartmentInfoFromPodname("database")
 
 	fmt.Printf("UpdatePolicy: frontend: %+v, backend: %+v\n", frontendpod, backendpod)
 
@@ -347,6 +347,9 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 
 	// testscenario
 	// srcid = frontendid, dstid = backendid
+	// "default:frontend": 180,
+	// "default:backend":  181,
+	// "default:database": 182,
 	if strings.Contains(policies.PolicyKey, "frontendpolicy") {
 		ebpf.Gupdate_comp_policy_map(allowAll, 443, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
 		ebpf.Gupdate_comp_policy_map(allowAll, 53, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.EGRESS, false)   // allow egress from frontend to anywhere on port 53
@@ -357,6 +360,11 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 	}
 
 	if strings.Contains(policies.PolicyKey, "backendpolicy") {
+
+	}
+
+	if strings.Contains(policies.PolicyKey, "databasepolicy") {
+		ebpf.Gupdate_comp_policy_map(backendpod.EbpfRemoteLabelID, 0, policyID["databasepolicy"], databasepod.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
 	}
 
 	return nil
