@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: frontend
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      role: frontend
+  template:
+    metadata:
+      labels:
+        role: frontend
+      name: frontend
+    spec:
+      #     securityContext:
+      #       windowsOptions:
+      #         hostProcess: true
+      #         runAsUserName: "NT AUTHORITY\\Local service"
+      #     hostNetwork: true
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: role1
+                    operator: In
+                    values:
+                      - frontend
+
+      containers:
+        - name: frontend
+          image: k8s.gcr.io/e2e-test-images/agnhost:2.36
+          command: ["/agnhost"]
+          args: ["serve-hostname", "--http", "--port", "80"]
+
+      nodeSelector:
+        kubernetes.io/os: windows
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    role: backend
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      role: backend
+  template:
+    metadata:
+      labels:
+        role: backend
+      name: backend
+    spec:
+      #     securityContext:
+      #       windowsOptions:
+      #         hostProcess: true
+      #         runAsUserName: "NT AUTHORITY\\Local service"
+      #     hostNetwork: true
+
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: role2
+                    operator: In
+                    values:
+                      - backend
+
+      containers:
+        - name: backend
+          image: k8s.gcr.io/e2e-test-images/agnhost:2.36
+          command: ["/agnhost"]
+          args: ["serve-hostname", "--http", "--port", "80"]
+      nodeSelector:
+        kubernetes.io/os: windows
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    role: database
+  name: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      role: database
+  template:
+    metadata:
+      labels:
+        role: database
+      name: database
+    spec:
+      #     securityContext:
+      #       windowsOptions:
+      #         hostProcess: true
+      #         runAsUserName: "NT AUTHORITY\\Local service"
+      #     hostNetwork: true
+
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: role3
+                    operator: In
+                    values:
+                      - database
+
+      containers:
+        - name: database
+          image: k8s.gcr.io/e2e-test-images/agnhost:2.36
+          command: ["/agnhost"]
+          args: ["serve-hostname", "--http", "--port", "80"]
+      nodeSelector:
+        kubernetes.io/os: windows
