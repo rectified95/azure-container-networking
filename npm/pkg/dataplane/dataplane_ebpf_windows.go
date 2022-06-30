@@ -255,6 +255,8 @@ func (e *EbpfDataplane) AddToSets(setMetadatas []*ipsets.IPSetMetadata, podMetad
 		// attach ebpf program to compartment
 		// uncomment this when ready
 		ebpf.AttachProgsToCompartment(compartment.CompartmentID)
+
+		ebpf.UpdateIPCacheMap(compartment.PodMetadata.PodIP, compartment.EbpfRemoteLabelID)
 	}
 	return nil
 }
