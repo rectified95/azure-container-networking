@@ -151,12 +151,18 @@ func initialize() (*WinEbpfState, int) {
 
 func UpdateIPCacheMap(ip string, id int) int {
 	tempip := net.ParseIP(ip)
+	if tempip == nil {
+		fmt.Println("failed to parse ip %s", ip)
+		return -1
+	}
+
 	err := gupdate_ip_cache(uint32(id), tempip, false)
 	if err != 0 {
 		fmt.Println("Error: Could not add to ip cache")
 		return -1
 	}
 	return 0
+
 }
 
 func test_scenario(srcID, dstID int) int {
@@ -201,7 +207,7 @@ func test_scenario(srcID, dstID int) int {
 
 	Gupdate_comp_policy_map(200, 443, 700, srcID, INGRESS, false) // allow ingress to frontend from anywhere on port 443
 	Gupdate_comp_policy_map(200, 53, 700, srcID, EGRESS, false)   // allow egress from frontend to anywhere on port 53
-	
+
 	Gupdate_comp_policy_map(123, 443, 700, srcID, EGRESS, false)  // allow egress from frontend to backend on port 443 (map above)
 	Gupdate_comp_policy_map(789, 443, 700, dstID, INGRESS, false) // allow ingress from frontend to backend on port 443
 

@@ -142,7 +142,7 @@ func GetRemoteLabelID(podname string) int {
 	case strings.Contains(podname, "database"):
 		return 789
 	default:
-		return 000
+		return 0
 	}
 }
 
@@ -255,8 +255,9 @@ func (e *EbpfDataplane) AddToSets(setMetadatas []*ipsets.IPSetMetadata, podMetad
 		// attach ebpf program to compartment
 		// uncomment this when ready
 		ebpf.AttachProgsToCompartment(compartment.CompartmentID)
-
-		ebpf.UpdateIPCacheMap(compartment.PodMetadata.PodIP, compartment.EbpfRemoteLabelID)
+		if compartment.EbpfRemoteLabelID != 0 {
+			ebpf.UpdateIPCacheMap(compartment.PodMetadata.PodIP, compartment.EbpfRemoteLabelID)
+		}
 	}
 	return nil
 }
@@ -321,7 +322,11 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 		"database",
 	}
 
-	policyID := make(map[string]int)
+	policyID := map[string]int{
+		"frontendpolicy": 111,
+		"backendpolicy":  222,
+		"databasepolicy": 333,
+	}
 
 	ensureAllPodsExist := func() error {
 		for _, podname := range podnames {
@@ -364,7 +369,9 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 	}
 
 	if strings.Contains(policies.PolicyKey, "databasepolicy") {
-		ebpf.Gupdate_comp_policy_map(backendpod.EbpfRemoteLabelID, 0, policyID["databasepolicy"], databasepod.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
+		ebpf.Gupdate_comp_policy_map(backendpod.EbpfRemoteLabelID, 80, policyID["databasepolicy"], databasepod.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
+		ebpf.Gupdate_comp_policy_map(databasepod.EbpfRemoteLabelID, 80, policyID["databasepolicy"], backendpod.CompartmentID, ebpf.EGRESS, false)  // allow ingress to frontend from anywhere on port 443
+
 	}
 
 	return nil
