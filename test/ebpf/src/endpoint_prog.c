@@ -79,14 +79,14 @@ _policy_eval(bpf_sock_addr_t *ctx)
 
     // Look up L4 first 
     uint32_t *verdict = bpf_map_lookup_elem(policy_map_id, &key);
-    bpf_printk("looked up policy map id %d with labelid: %d, direction: %d, remote port: %d\n", 
-             key.remote_pod_label_id, key.direction, key.remote_port);
     if (verdict != NULL)
     {
         bpf_printk("Policy Eval: L4 policy ID %lu Allowed, remote_pod_label %d.", 
             *verdict, key.remote_pod_label_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
+    bpf_printk("No L4 rules found; Looked up policy map with labelid: %d, direction: %d, remote port: %d\n", 
+             key.remote_pod_label_id, key.direction, key.remote_port);
 
     // // Look up L3 rules
     key.remote_port = 0;
@@ -97,7 +97,7 @@ _policy_eval(bpf_sock_addr_t *ctx)
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
 
-    bpf_printk("no L3 rules found for labelid: %d, direction: %d, remote port: %d\n", 
+    bpf_printk("Dropping packet: no L3 rules found for labelid: %d, direction: %d, remote port: %d\n", 
              key.remote_pod_label_id, key.direction, key.remote_port);
 
     return BPF_SOCK_ADDR_VERDICT_REJECT;
