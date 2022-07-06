@@ -369,7 +369,7 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 
 		if backendpod != nil && frontendpod != nil {
 			ebpf.Gupdate_comp_policy_map(backendpod.EbpfRemoteLabelID, 80, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.EGRESS, false)      // allow egress from frontend to backend on port 443 (map above)
-			ebpf.Gupdate_comp_policy_map(frontendpod.EbpfRemoteLabelID, 80, policyID["frontendpolicy"], backendpod.EbpfRemoteLabelID, ebpf.INGRESS, false) // allow ingress from frontend to backend on port 443
+			ebpf.Gupdate_comp_policy_map(frontendpod.EbpfRemoteLabelID, 80, policyID["frontendpolicy"], backendpod.CompartmentID, ebpf.INGRESS, false) // allow ingress from frontend to backend on port 443
 		}
 
 	}
