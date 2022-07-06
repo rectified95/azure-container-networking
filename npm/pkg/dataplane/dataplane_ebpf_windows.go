@@ -246,18 +246,24 @@ func (e *EbpfDataplane) AddToSets(setMetadatas []*ipsets.IPSetMetadata, podMetad
 		var err error
 		compartment, err = BuildCompartmentInfo(*podMetadata)
 		if err != nil {
-			log.Printf("[ebpf] failed to get local compartment with err %w", err)
+			log.Printf("[ebpf] failed to get local compartment with err %v", err)
 		}
 		log.Printf("[ebpf] AddToSets: Compartment ID:%d, %+v", compartment.CompartmentID, podMetadata)
 
 		e.iptocompartment[podMetadata.PodIP] = compartment
 
-		// attach ebpf program to compartment
-		// uncomment this when ready
-		ebpf.AttachProgsToCompartment(compartment.CompartmentID)
 		if compartment.EbpfRemoteLabelID != 0 {
-			ebpf.UpdateIPCacheMap(compartment.PodMetadata.PodIP, compartment.EbpfRemoteLabelID)
+			// attach ebpf program to compartment
+			// uncomment this when ready
+			log.Printf("[ebpf] attaching program to compartment id %d", compartment.CompartmentID)
+			ebpf.AttachProgsToCompartment(compartment.CompartmentID)
+			if compartment.EbpfRemoteLabelID != 0 {
+				ebpf.UpdateIPCacheMap(compartment.PodMetadata.PodIP, compartment.EbpfRemoteLabelID)
+			}
+		} else {
+			log.Printf("[ebpf] skipping attach programs to %+v", podMetadata)
 		}
+
 	}
 	return nil
 }
@@ -356,11 +362,15 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 	// "default:backend":  181,
 	// "default:database": 182,
 	if strings.Contains(policies.PolicyKey, "frontendpolicy") {
-		ebpf.Gupdate_comp_policy_map(allowAll, 443, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
-		ebpf.Gupdate_comp_policy_map(allowAll, 53, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.EGRESS, false)   // allow egress from frontend to anywhere on port 53
+		if frontendpod != nil {
+			ebpf.Gupdate_comp_policy_map(allowAll, 80, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
+			ebpf.Gupdate_comp_policy_map(allowAll, 53, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.EGRESS, false)  // allow egress from frontend to anywhere on port 53
+		}
 
-		ebpf.Gupdate_comp_policy_map(backendpod.EbpfRemoteLabelID, 443, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.EGRESS, false)      // allow egress from frontend to backend on port 443 (map above)
-		ebpf.Gupdate_comp_policy_map(frontendpod.EbpfRemoteLabelID, 443, policyID["frontendpolicy"], backendpod.EbpfRemoteLabelID, ebpf.INGRESS, false) // allow ingress from frontend to backend on port 443
+		if backendpod != nil && frontendpod != nil {
+			ebpf.Gupdate_comp_policy_map(backendpod.EbpfRemoteLabelID, 80, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.EGRESS, false)      // allow egress from frontend to backend on port 443 (map above)
+			ebpf.Gupdate_comp_policy_map(frontendpod.EbpfRemoteLabelID, 80, policyID["frontendpolicy"], backendpod.EbpfRemoteLabelID, ebpf.INGRESS, false) // allow ingress from frontend to backend on port 443
+		}
 
 	}
 
@@ -369,8 +379,10 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 	}
 
 	if strings.Contains(policies.PolicyKey, "databasepolicy") {
-		ebpf.Gupdate_comp_policy_map(backendpod.EbpfRemoteLabelID, 80, policyID["databasepolicy"], databasepod.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
-		ebpf.Gupdate_comp_policy_map(databasepod.EbpfRemoteLabelID, 80, policyID["databasepolicy"], backendpod.CompartmentID, ebpf.EGRESS, false)  // allow ingress to frontend from anywhere on port 443
+		if backendpod != nil && databasepod != nil {
+			ebpf.Gupdate_comp_policy_map(backendpod.EbpfRemoteLabelID, 80, policyID["databasepolicy"], databasepod.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
+			ebpf.Gupdate_comp_policy_map(databasepod.EbpfRemoteLabelID, 80, policyID["databasepolicy"], backendpod.CompartmentID, ebpf.EGRESS, false)  // allow ingress to frontend from anywhere on port 443
+		}
 
 	}
 

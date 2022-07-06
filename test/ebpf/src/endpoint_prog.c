@@ -50,7 +50,7 @@ struct bpf_map_def tail_call_state_cache = {
 
 // TODO declare identity cache map
 
-__inline int
+__always_inline int
 _policy_eval(bpf_sock_addr_t *ctx)
 {
     bpf_sock_addr_t ctx_cpy = *ctx;
@@ -69,8 +69,8 @@ _policy_eval(bpf_sock_addr_t *ctx)
     {
         // If there is no policy map attached to this compartment, 
         // then no policy is applied, allow all traffic.
-        // bpf_printk("Policy Eval: No policy map for compartment id %d - allowing traffic.", 
-        //     ctx->compartment_id);
+        bpf_printk("Policy Eval: No policy map for compartment id %d - allowing traffic.", 
+            ctx->compartment_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     };
     
@@ -79,6 +79,8 @@ _policy_eval(bpf_sock_addr_t *ctx)
 
     // Look up L4 first 
     uint32_t *verdict = bpf_map_lookup_elem(policy_map_id, &key);
+    bpf_printk("looked up policy map id %d with labelid: %d, direction: %d, remote port: %d\n", 
+             key.remote_pod_label_id, key.direction, key.remote_port);
     if (verdict != NULL)
     {
         bpf_printk("Policy Eval: L4 policy ID %lu Allowed, remote_pod_label %d.", 
@@ -95,13 +97,13 @@ _policy_eval(bpf_sock_addr_t *ctx)
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
 
-    // bpf_printk("no L3 rules found for labelid: %d, direction: %d, remote port: %d\n", 
-    //         key.remote_pod_label_id, key.direction, key.remote_port);
+    bpf_printk("no L3 rules found for labelid: %d, direction: %d, remote port: %d\n", 
+             key.remote_pod_label_id, key.direction, key.remote_port);
 
     return BPF_SOCK_ADDR_VERDICT_REJECT;
 }
 
-__inline int
+__always_inline int
 authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
 {
     ip_address_t ip_to_lookup = {0};
@@ -185,7 +187,7 @@ int authorize_recv_accept4(bpf_sock_addr_t *ctx)
 
 // ### IPv6 ### //
 // ###      ### //
-__inline int
+__always_inline int
 authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
 {
     ip_address_t ip_to_lookup = {0};
