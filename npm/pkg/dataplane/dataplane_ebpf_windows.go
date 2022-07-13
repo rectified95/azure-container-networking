@@ -363,7 +363,8 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 	// "default:database": 182,
 	if strings.Contains(policies.PolicyKey, "frontendpolicy") {
 		if frontendpod != nil {
-			ebpf.Gupdate_comp_policy_map(allowAll, 80, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
+			ebpf.Gupdate_comp_policy_map(allowAll, 80, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.EGRESS, false) // frontend can ping anywhere
+			//ebpf.Gupdate_comp_policy_map(allowAll, 80, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
 			ebpf.Gupdate_comp_policy_map(allowAll, 53, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.EGRESS, false)  // allow egress from frontend to anywhere on port 53
 		}
 

@@ -73,12 +73,18 @@ _policy_eval(bpf_sock_addr_t *ctx)
             ctx->compartment_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     };
-    
-    // bpf_printk("Comp_policy map found; remoteLabel %d, port %d, dir %d\n", 
-    //     key.remote_pod_label_id, key.remote_port, key.direction);  
+
+    // Check if catch-all label 200 present in map.
+    policy_map_key_t key_catchall = key;
+    key_catchall.remote_pod_label_id = 200;
+    uint32_t *verdict = bpf_map_lookup_elem(policy_map_id, &key_catchall);
+    if (verdict != NULL) {
+        bpf_printk("Policy eval - found AllowAll.");
+        return BPF_SOCK_ADDR_VERDICT_PROCEED;
+    }
 
     // Look up L4 first 
-    uint32_t *verdict = bpf_map_lookup_elem(policy_map_id, &key);
+    verdict = bpf_map_lookup_elem(policy_map_id, &key);
     if (verdict != NULL)
     {
         bpf_printk("Policy Eval: L4 policy ID %lu Allowed, remote_pod_label %d.", 
@@ -117,23 +123,22 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     {
-        bpf_printk("No label found for IP %u port %u, dropping packet.",
-            bpf_ntohl(ip_to_lookup.ipv4), bpf_ntohs(ctx->user_port));
-
         // (TODO) comment different from code
-
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
         return BPF_SOCK_ADDR_VERDICT_REJECT;
     }
 
+    if (dir == EGRESS) {
+        bpf_printk("Connect4 called srcip: %u, dstip: %u, dstport: %u", 
+            bpf_ntohl(ctx->msg_src_ip4), bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
+    } else if (dir == INGRESS) {
+        bpf_printk("Recv_accept4 called srcip: %u, dstip: %u, dstport: %u", 
+            bpf_ntohl(ctx->msg_src_ip4),  bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
+    }
+    
     bpf_printk("Looked up label %d for remote ip %d\n", 
         *ctx_label_id, ip_to_lookup.ipv4);
-
-    if (*ctx_label_id == 200) {
-        bpf_printk("Label 200(ANY) - allow.");
-        return BPF_SOCK_ADDR_VERDICT_PROCEED;
-    }
     
     policy_map_key_t key = {0};
     key.remote_pod_label_id = *ctx_label_id;
@@ -152,13 +157,8 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
 
 SEC("cgroup/connect4_0")
 int authorize_connect4_0(bpf_sock_addr_t *ctx)
-{
-    bpf_printk("1. tail call link - inside connect4_0");
-    bpf_printk("Connect4 called srcip: %u, dstip: %u, dstport: %u", 
-        bpf_ntohl(ctx->msg_src_ip4), bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
-    
+{   
     int _ = authorize_v4(ctx, EGRESS);
-
     bpf_tail_call(ctx, &prog_array_map, 1);
 
     return BPF_SOCK_ADDR_VERDICT_REJECT;
@@ -167,17 +167,12 @@ int authorize_connect4_0(bpf_sock_addr_t *ctx)
 SEC("cgroup/policy_eval")
 int policy_eval_prog(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("2. tail call link");
     return _policy_eval(ctx);
 }
 
 SEC("cgroup/recv_accept4")
 int authorize_recv_accept4(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("inside recv_accept4_0\n");
-    bpf_printk("Recv_accept4 called srcip: %u, dstip: %u, dstport: %u", 
-        bpf_ntohl(ctx->msg_src_ip4),  bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
-
     int _ = authorize_v4(ctx, INGRESS);
     bpf_tail_call(ctx, &prog_array_map, 1);
 
@@ -213,7 +208,6 @@ authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     {
-        bpf_printk("No label found for IP %u, dstport %u, dropping packet.", bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
         return BPF_SOCK_ADDR_VERDICT_REJECT;
