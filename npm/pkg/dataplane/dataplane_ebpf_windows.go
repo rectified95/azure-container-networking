@@ -191,11 +191,11 @@ func (e *EbpfDataplane) GetCompartmentInfoFromPodname(podname string) ([]*Compar
 		}
 	}
 
-	if strings.Contains(podname, "backend") {
-		if (len(comps) == 2) {
-			return comps, nil
-		}	
-	}
+	// if strings.Contains(podname, "backend") {
+	// 	if (len(comps) == 2) {
+	// 		return comps, nil
+	// 	}	
+	// }
 	if (len(comps) != 0) {
 		return comps, nil
 	}

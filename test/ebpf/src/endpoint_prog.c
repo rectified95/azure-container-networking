@@ -74,6 +74,9 @@ _policy_eval(bpf_sock_addr_t *ctx)
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     };
 
+    bpf_printk("Retrieved map for compartment_id: %d.", 
+            ctx->compartment_id);
+
     // Check if catch-all label 200 present in map.
     policy_map_key_t key_catchall = key;
     key_catchall.remote_pod_label_id = 200;
@@ -114,11 +117,21 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
 {
     ip_address_t ip_to_lookup = {0};
     ip_to_lookup.ipv4 = ctx->user_ip4;
+
+    bpf_printk("Protocol: %d, port: %d", ctx->protocol, bpf_ntohs(ctx->user_port));
+
     if (dir == INGRESS)
     {
+        // We use remote IP for compartment map lookup later on.
         ip_to_lookup.ipv4 = ctx->msg_src_ip4;
-    }
-
+    } //else if (dir == EGRESS) {
+    //     // (TODO) Make this UDP aware. For now hardcoding allow-rule for DNS queries.
+        if (bpf_ntohs(ctx->user_port) == 53) {
+            bpf_printk("Port 53 - allowing.");
+            return BPF_SOCK_ADDR_VERDICT_PROCEED;
+        }
+    //}
+     
     uint32_t *ctx_label_id = NULL;
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
@@ -126,6 +139,7 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         // (TODO) comment different from code
         // if there is no Identity assigned then CP is yet to sync
         // allow all traffic.
+        bpf_printk("no label found for IP %d", bpf_ntohl(ip_to_lookup.ipv4));
         return BPF_SOCK_ADDR_VERDICT_REJECT;
     }
 
@@ -157,8 +171,13 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
 
 SEC("cgroup/connect4_0")
 int authorize_connect4_0(bpf_sock_addr_t *ctx)
-{   
+{   bpf_printk("connect4");
+
     int _ = authorize_v4(ctx, EGRESS);
+    if (_ == BPF_SOCK_ADDR_VERDICT_PROCEED) {
+        return _;
+    }
+
     bpf_tail_call(ctx, &prog_array_map, 1);
 
     return BPF_SOCK_ADDR_VERDICT_REJECT;
@@ -172,70 +191,32 @@ int policy_eval_prog(bpf_sock_addr_t *ctx)
 
 SEC("cgroup/recv_accept4")
 int authorize_recv_accept4(bpf_sock_addr_t *ctx)
-{
+{bpf_printk("recv4");
     int _ = authorize_v4(ctx, INGRESS);
     bpf_tail_call(ctx, &prog_array_map, 1);
 
-    return BPF_SOCK_ADDR_VERDICT_REJECT; 
+    return _; 
 }
-
 
 // ### IPv6 ### //
 // ###      ### //
-__always_inline int
-authorize_v6(bpf_sock_addr_t *ctx, direction_t dir)
-{
-    ip_address_t ip_to_lookup = {0};
-    __builtin_memcpy(ip_to_lookup.ipv6, ctx->msg_src_ip6, sizeof(ctx->msg_src_ip6));
-    if (dir == INGRESS)
-    {
-        __builtin_memcpy(ip_to_lookup.ipv6, ctx->user_ip6, sizeof(ctx->msg_src_ip6));
-    }
-
-    /* with this below check for some reason verification fails.
-
-    int32_t *policy_map_fd =  (int32_t *)bpf_map_lookup_elem(&map_policy_maps, &ctx->compartment_id);
-    if (policy_map_fd == NULL)
-    {
-        bpf_printk("Policy Eval: No policy map for compartment");
-        // if there is no policy map attached to this compartment
-        // then no policy is applied, allow all traffic.
-        return BPF_SOCK_ADDR_VERDICT_PROCEED;
-    }
-    */
-
-    uint32_t *ctx_label_id = NULL;
-    ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
-    if (ctx_label_id == NULL)
-    {
-        // if there is no Identity assigned then CP is yet to sync
-        // allow all traffic.
-        return BPF_SOCK_ADDR_VERDICT_REJECT;
-    }
-
-    policy_map_key_t key = {0};
-    key.remote_pod_label_id = *ctx_label_id;
-    key.remote_port = ctx->user_port;
-    // key.protocol = ctx->protocol;
-    key.direction = dir;
-
-    return _policy_eval(ctx);
-}
-
-// TODO - implement
 SEC("cgroup/connect6")
 int authorize_connect6(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("Connect6 called");
+    bpf_printk("connect6");
+    int _ = authorize_v4(ctx, EGRESS);
+    bpf_tail_call(ctx, &prog_array_map, 1);
 
-    return authorize_v6(ctx, EGRESS);
+    return BPF_SOCK_ADDR_VERDICT_REJECT;
 }
 
 // TODO - implement
 SEC("cgroup/recv_accept6")
 int authorize_recv_accept6(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("Recv_accept6 called");
+    bpf_printk("recv6");
+    int _ = authorize_v4(ctx, INGRESS);
+    bpf_tail_call(ctx, &prog_array_map, 1);
 
-    return authorize_v6(ctx, INGRESS);
+    return BPF_SOCK_ADDR_VERDICT_REJECT; 
 }
