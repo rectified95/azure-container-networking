@@ -74,15 +74,12 @@ _policy_eval(bpf_sock_addr_t *ctx)
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     };
 
-    bpf_printk("Retrieved map for compartment_id: %d.", 
-            ctx->compartment_id);
-
     // Check if catch-all label 200 present in map.
     policy_map_key_t key_catchall = key;
     key_catchall.remote_pod_label_id = 200;
     uint32_t *verdict = bpf_map_lookup_elem(policy_map_id, &key_catchall);
     if (verdict != NULL) {
-        bpf_printk("Policy eval - found AllowAll.");
+        bpf_printk("Policy Eval - found AllowAll. Compartment ID - %d", comp_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
 
@@ -90,24 +87,34 @@ _policy_eval(bpf_sock_addr_t *ctx)
     verdict = bpf_map_lookup_elem(policy_map_id, &key);
     if (verdict != NULL)
     {
-        bpf_printk("Policy Eval: L4 policy ID %lu Allowed, remote_pod_label %d.", 
-            *verdict, key.remote_pod_label_id);
+        if (key.direction == EGRESS) {
+            bpf_printk("Connect_4 srcIP: %u, dstIP: %u, port: %u", 
+                bpf_ntohl(ctx->msg_src_ip4), bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
+        } else if (key.direction == INGRESS) {
+            bpf_printk("Receive_4 srcIP: %u, dstIP: %u, port: %u", 
+                bpf_ntohl(ctx->msg_src_ip4),  bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
+        }
+
+        bpf_printk("Policy Eval: L4 policy ID %lu Allowed, remote_pod_label %d, compartment %d.\n", 
+            *verdict, key.remote_pod_label_id, comp_id);
+
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
-    bpf_printk("No L4 rules found; Looked up policy map with labelid: %d, direction: %d, remote port: %d\n", 
-             key.remote_pod_label_id, key.direction, key.remote_port);
 
     // // Look up L3 rules
     key.remote_port = 0;
     verdict = bpf_map_lookup_elem(policy_map_id, &key);
     if (verdict != NULL)
     {
-        bpf_printk("Policy Eval: L3 policy ID %lu Allowed.", *verdict);
+        bpf_printk("Policy Eval: L3 policy ID %lu Allowed, remote_pod_label %d, compartment %d.",
+            *verdict, key.remote_pod_label_id, comp_id);
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
 
-    bpf_printk("Dropping packet: no L3 rules found for labelid: %d, direction: %d, remote port: %d\n", 
-             key.remote_pod_label_id, key.direction, key.remote_port);
+    if (key.remote_pod_label_id != 200) {
+        bpf_printk("Dropping packet: no L4 or L3 rules found for labelid: %d, direction: %d, port: %d\n", 
+                key.remote_pod_label_id, key.direction, bpf_ntohs(ctx->user_port));
+    }
 
     return BPF_SOCK_ADDR_VERDICT_REJECT;
 }
@@ -124,9 +131,9 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         ip_to_lookup.ipv4 = ctx->msg_src_ip4;
     }
     
-    // (TODO) Make this UDP aware. For now hardcoding allow-rule for DNS queries.
+    // For now hardcoding allow-rule for DNS queries.
     if (bpf_ntohs(ctx->user_port) == 53) {
-        bpf_printk("Port 53 - allowing.");
+        bpf_printk("Port 53 - allowing DNS.");
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
     
@@ -148,19 +155,11 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
     {
         // If there is no Identity assigned then CP is yet to sync
         // allow all traffic.
-        bpf_printk("No known label found, assigning INTERNET label for IP %d", bpf_ntohl(ip_to_lookup.ipv4));
+        //bpf_printk("No known label found, assigning INTERNET label for IP %d", bpf_ntohl(ip_to_lookup.ipv4));
         ctx_label_id = &allowAll;
     } else {
-        bpf_printk("Looked up label %d for remote ip %d\n", 
-            *ctx_label_id, ip_to_lookup.ipv4);
-    }
-
-    if (dir == EGRESS) {
-        bpf_printk("Connect_4 called srcip: %u, dstip: %u, dstport: %u", 
-            bpf_ntohl(ctx->msg_src_ip4), bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
-    } else if (dir == INGRESS) {
-        bpf_printk("Receive_4 called srcip: %u, dstip: %u, dstport: %u", 
-            bpf_ntohl(ctx->msg_src_ip4),  bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
+        bpf_printk("\nLooked up label %d for remote ip %d\n", 
+            *ctx_label_id, bpf_ntohl(ip_to_lookup.ipv4));
     }
     
     policy_map_key_t key = {0};

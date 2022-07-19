@@ -1,5 +1,4 @@
 package ebpf
-
 /*
 #include <stdlib.h>
 #include "testSockProg.h"
@@ -10,8 +9,6 @@ import (
 	"fmt"
 	"net"
 	"time"
-
-	"github.com/Azure/azure-container-networking/common"
 )
 
 type direction int
@@ -43,23 +40,7 @@ func NewWinEbfState(epprog C.struct_npm_endpoint_prog_t) *WinEbpfState {
 }
 
 func InitializeEbpfState() {
-	fmt.Println("starting ebpf program")
-
-	ioShim := common.NewIOShim()
-
-	network, err := ioShim.Hns.GetNetworkByName(AzureNetworkName)
-	if err != nil {
-		fmt.Println("Error: Could not get network, %s", err)
-		return
-	}
-
-	endpoints, err := ioShim.Hns.ListEndpointsOfNetwork(network.Id)
-	if err != nil {
-		fmt.Println("Error: Could not get endpoints, %s", err)
-		return
-	}
-
-	fmt.Println(endpoints)
+	fmt.Println("Starting ebpf program")
 
 	winState, res := initialize()
 	if res == RET_ERR {
@@ -133,11 +114,11 @@ func CreateUpdateCompPolicyMap(id int) error {
 }
 
 func initialize() (*WinEbpfState, int) {
-	fmt.Println("init")
+	fmt.Println("Init")
 	r := (C.struct_npm_endpoint_prog_t)(C.test_ebpf_prog())
 
 	if (r == C.struct_npm_endpoint_prog_t{}) {
-		fmt.Print("failed to load")
+		fmt.Print("Failed to load")
 		return nil, RET_ERR
 	}
 

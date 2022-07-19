@@ -103,7 +103,6 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     struct npm_endpoint_prog_t _npm_endpoint_prog_t;
     struct bpf_object *object;
     int program_fd;
-    //int result = bpf_prog_load("src/endpoint_prog.o", BPF_PROG_TYPE_CGROUP_SOCK_ADDR, &object, &program_fd);
     int result = bpf_prog_load("src/endpoint_prog.o", BPF_PROG_TYPE_CGROUP_SOCK_ADDR, &object, &program_fd);
     
 
@@ -112,9 +111,7 @@ struct npm_endpoint_prog_t test_ebpf_prog()
         printf("object is null\n");
         return _npm_endpoint_prog_t;
     }
-    printf("Loaded program\n");
-    printf("%d program fd\n", program_fd);
-    printf("%d result\n", result);
+    printf("Loaded eBPF program.\n");
 
     if (result < 0)
     {
@@ -148,8 +145,6 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     bpf_map_update_elem(prog_map_fd, &index, &callee1_fd, 0);
     printf("callee_1 close res %d", _close(callee1_fd));
 
-    printf("connect program \n");
-
     struct bpf_program *connect6_program = bpf_object__find_program_by_name(object, connect6_program_name);
     if (!connect6_program) 
     {
@@ -158,7 +153,6 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     }
 
     _npm_endpoint_prog_t.connect6_program = connect6_program;
-    printf("connect6 program\n");
 
     struct bpf_program *recv_accept_program = bpf_object__find_program_by_name(object, recv4_accept_program_name);
     if (!recv_accept_program)
@@ -168,7 +162,6 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     }
 
     _npm_endpoint_prog_t.recv4_accept_program = recv_accept_program;
-    printf("recv program\n");
 
     struct bpf_program *recv6_accept_program = bpf_object__find_program_by_name(object, recv6_accept_program_name);
     if (!recv6_accept_program)
@@ -178,38 +171,36 @@ struct npm_endpoint_prog_t test_ebpf_prog()
     }
 
     _npm_endpoint_prog_t.recv6_accept_program = recv6_accept_program;
-    printf("recv6 program\n");
-    printf("Now getting MAP fds and pinning them\n");
 
     struct bpf_map *map_policy_maps_obj = bpf_object__find_map_by_name(object, "map_policy_maps");
     if (map_policy_maps_obj == NULL)
     {
-        printf("global policy map is null\n");
+        printf("Global policy map is null\n");
         return _npm_endpoint_prog_t;
     }
 
     int err = pin_given_map(GLOBAL_POLICY_MAP, bpf_map__fd(map_policy_maps_obj));
     if (err < 0)
     {
-        printf("Failed to pin GLOBAL POLICY MAP\n");
+        printf("Failed to pin GLOBAL POLICY MAP.\n");
         return _npm_endpoint_prog_t;
     }
-    printf("DONE pinning GLOBAL POLICY MAP\n");
+    printf("Done pinning global policy map.\n");
 
     struct bpf_map *ip_cache_map_obj = bpf_object__find_map_by_name(object, "ip_cache_map");
     if (ip_cache_map_obj == NULL)
     {
-        printf("ip cache map is null\n");
+        printf("IP cache map is null.\n");
         return _npm_endpoint_prog_t;
     }
 
     err = pin_given_map(IP_CACHE_MAP, bpf_map__fd(ip_cache_map_obj));
     if (err < 0)
     {
-        printf("Failed to pin ip cache MAP\n");
+        printf("Failed to pin ip cache MAP.\n");
         return _npm_endpoint_prog_t;
     }
-    printf("DONE pinning ip cache MAP\n");
+    printf("Done pinning ip cache map.\n");
 
     return _npm_endpoint_prog_t;
 }
@@ -262,46 +253,36 @@ int attach_progs(struct npm_endpoint_prog_t npm_ep)
 
 int attach_progs_to_compartment(struct npm_endpoint_prog_t npm_ep, int compartment_id)
 {
-    printf("attaching progs to compartment %d\n", compartment_id);
-    printf("attach V4 connect prog\n");
-    // attach V4 connect prog
+    printf("Attaching progs to compartment %d\n", compartment_id);
+
     fd_t connect_0_fd = bpf_program__fd(npm_ep.connect4_0_program);
     fd_t connect_1_fd = bpf_program__fd(npm_ep.policy_eval_program);
-    //printf("connect_0_fd %d; connect_1_fd %d", connect_0_fd, connect_1_fd);
+
     int result = bpf_prog_attach(connect_0_fd, compartment_id, BPF_CGROUP_INET4_CONNECT, 0);
     if (result != 0)
     {
-        printf("Error is null while attaching v4_0 connect prog\n");
+        printf("Error is null while attaching v4_0 connect prog.\n");
         return result;
     }
-    printf("attached program %s to comp_id %d", "connect_4_0", compartment_id);
-    // result = bpf_prog_attach(connect_1_fd, compartment_id, BPF_CGROUP_INET4_CONNECT, 0);
-    // if (result != 0)
-    // {
-    //     printf("Error is null while attaching v4_1 connect prog\n");
-    //     return result;
-    // }
-    printf("attach V6 connect prog\n");
-    // attach V6 connect prog
+    printf("Attached program connect_4_0 to comp_id %d.\n", compartment_id);
+
+    printf("Attach V6 connect prog.\n");
     bpf_prog_attach(bpf_program__fd(npm_ep.connect6_program), compartment_id, BPF_CGROUP_INET6_CONNECT, 0);
     if (result != 0)
     {
         printf("Error while attaching v6 connect prog\n");
         return result;
     }
-    printf("attach V4 recv prog\n");
-    // attach V4 recv prog
+
     bpf_prog_attach(bpf_program__fd(npm_ep.recv4_accept_program), compartment_id, BPF_CGROUP_INET4_RECV_ACCEPT, 0);
     if (result != 0)
     {
         printf("Error is null while attaching v4 recv prog\n");
         return result;
     }
-    printf("attached program %s to comp_id %d", "recv_4", compartment_id);
+    printf("Attached program %s to comp_id %d", "recv_4.\n", compartment_id);
 
-    printf("attach V6 recv prog\n");
-    // attach V6 recv prog
-
+    printf("Attach V6 recv prog\n");
     bpf_prog_attach(bpf_program__fd(npm_ep.recv6_accept_program), compartment_id, BPF_CGROUP_INET6_RECV_ACCEPT, 0);
     if (result != 0)
     {
@@ -314,14 +295,11 @@ int attach_progs_to_compartment(struct npm_endpoint_prog_t npm_ep, int compartme
 
 fd_t create_comp_bpf_map()
 {
-    // struct _map_properties *map_props;
-    printf("In create bpf map \n");
     ebpf_map_type_t map_type = BPF_MAP_TYPE_HASH;
     int key_size = sizeof(policy_map_key_t);
     int value_size = sizeof(uint32_t);
     int max_entries = POLICY_MAP_SIZE;
 
-    printf("Just before creating the map\n");
     fd_t inner_map_fd =
         bpf_create_map(map_type, key_size, value_size, max_entries, 0);
     if (inner_map_fd < 0)
@@ -336,12 +314,11 @@ fd_t create_comp_bpf_map()
 
 fd_t get_map_fd(int internal_map_type, int compartment_id)
 {
-    printf("in get_map_fd func\n");
     char *map_name = NULL;
     get_epmap_name(internal_map_type, compartment_id, &map_name);
     if (map_name == NULL)
     {
-        printf("map name is null\n");
+        printf("Map name is null.\n");
         return INVALID_MAP_FD;
     }
 
@@ -390,14 +367,12 @@ fd_t get_map_fd(int internal_map_type, int compartment_id)
 
 int update_global_policy_map(int compartment_id)
 {
-    printf("In update_global_policy_map func\n");
     fd_t compartment_policy_map_fd = get_map_fd(COMP_POLICY_MAP, compartment_id);
     if (compartment_policy_map_fd == INVALID_MAP_FD)
     {
         return -1;
     }
 
-    printf("Retrieving global policy map\n");
     fd_t global_policy_map_fd = get_map_fd(GLOBAL_POLICY_MAP, 0);
     if (global_policy_map_fd == INVALID_MAP_FD)
     {
@@ -412,13 +387,12 @@ int update_global_policy_map(int compartment_id)
         return error;
     }
     
-    printf("updated global policy map: com_id %d comp_map_fd %d", compartment_id, compartment_policy_map_fd);
+    printf("Updated global policy map: com_id %d comp_map_fd %d", compartment_id, compartment_policy_map_fd);
     return 0;
 }
 
 int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint16_t remote_port, int compartment_id, int policy_id, bool delete)
 {
-    printf("Updating comp policy map\n");
     fd_t comp_policy_map_fd = get_map_fd(COMP_POLICY_MAP, compartment_id);
     if (comp_policy_map_fd == INVALID_MAP_FD)
     {
@@ -430,7 +404,8 @@ int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint1
     key.remote_port = htons(remote_port);
     key.protocol = 0;
 
-    printf("printing label %d dir %d port %d\n", key.remote_pod_label_id, key.direction, key.remote_port);
+    printf("Updating comp_policy_map for comp_id %d label %d dir %d port %d\n", 
+        compartment_id, key.remote_pod_label_id, key.direction, key.remote_port);
     char* conv_key = (char*)&key;
     for (int i =0; i< sizeof(policy_map_key_t); ++i) {
         printf("%02x ", conv_key[i]);
@@ -466,12 +441,11 @@ int update_comp_policy_map(int remote_pod_label_id, direction_t direction, uint1
 int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4h, bool delete)
 {
     int ipv4 = bpf_htonl(ipv4h);
-
-    printf("Updating ip cache map for ip, before %u after %u\n",ipv4h, ipv4);
     fd_t ip_cache_map_fd = get_map_fd(IP_CACHE_MAP, 0);
+
     if (ip_cache_map_fd == INVALID_MAP_FD)
     {
-        printf("invalid map fd %u", ip_cache_map_fd);
+        printf("Invalid map fd %u", ip_cache_map_fd);
         return INVALID_MAP_FD;
     }
 
@@ -489,7 +463,6 @@ int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4h, bool delete)
 
         uint32_t value = 0;
         bpf_map_lookup_elem(ip_cache_map_fd, &ip_cache_key, &value);
-        printf("retrieved value %u from fd %d\n", value, ip_cache_map_fd);
     }
     else
     {
@@ -507,18 +480,6 @@ int update_ip_cache4(uint32_t ctx_label_id, uint32_t ipv4h, bool delete)
 
     int ret = _close(ip_cache_map_fd);
     printf("fd close res: %d\n", ret);
-    //printf("Listing keys\n");
-    // printf("get next key %d\n", bpf_map_get_next_key(ip_cache_map_fd, &key, &next_key));
-    // while(bpf_map_get_next_key(ip_cache_map_fd, &key, &next_key) == 0) {
-    //     printf("Got key %u ", key.ipv4);
-    //     int res = bpf_map_lookup_elem(ip_cache_map_fd, &next_key, &value);
-    //     if(res < 0) {
-    //         printf("No value??\n");
-    //     } else {
-    //         printf("%u\n", value);
-    //     }
-    //     key=next_key;
-    // }
 
     printf("Done updating ip cache map\n");
     return 0;

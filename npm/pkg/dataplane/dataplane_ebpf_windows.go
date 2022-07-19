@@ -219,8 +219,6 @@ func NewEbpfDataplane(config *Config) *EbpfDataplane {
 
 func (e *EbpfDataplane) BootupDataplane() error {
 	log.Printf("[ebpf] BootupDataplane")
-
-	// uncomment this when ready
 	ebpf.InitializeEbpfState()
 	return nil
 }
