@@ -118,21 +118,18 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
     ip_address_t ip_to_lookup = {0};
     ip_to_lookup.ipv4 = ctx->user_ip4;
 
-    bpf_printk("Protocol: %d, port: %d", ctx->protocol, bpf_ntohs(ctx->user_port));
-
     if (dir == INGRESS)
     {
         // We use remote IP for compartment map lookup later on.
         ip_to_lookup.ipv4 = ctx->msg_src_ip4;
-    } //else if (dir == EGRESS) {
-    //     // (TODO) Make this UDP aware. For now hardcoding allow-rule for DNS queries.
-        if (bpf_ntohs(ctx->user_port) == 53) {
-            bpf_printk("Port 53 - allowing.");
-            return BPF_SOCK_ADDR_VERDICT_PROCEED;
-        }
-    //}
-
-
+    }
+    
+    // (TODO) Make this UDP aware. For now hardcoding allow-rule for DNS queries.
+    if (bpf_ntohs(ctx->user_port) == 53) {
+        bpf_printk("Port 53 - allowing.");
+        return BPF_SOCK_ADDR_VERDICT_PROCEED;
+    }
+    
     uint32_t comp_id = ctx->compartment_id;
     void *policy_map_id = (uint32_t *)bpf_map_lookup_elem(&map_policy_maps, &comp_id);
     if (policy_map_id == NULL)
@@ -144,29 +141,27 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     };
 
-
-
+    uint32_t allowAll = 200;
     uint32_t *ctx_label_id = NULL;
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
     {
-        // (TODO) comment different from code
-        // if there is no Identity assigned then CP is yet to sync
+        // If there is no Identity assigned then CP is yet to sync
         // allow all traffic.
-        bpf_printk("no label found for IP %d", bpf_ntohl(ip_to_lookup.ipv4));
-        return BPF_SOCK_ADDR_VERDICT_REJECT;
+        bpf_printk("No known label found, assigning INTERNET label for IP %d", bpf_ntohl(ip_to_lookup.ipv4));
+        ctx_label_id = &allowAll;
+    } else {
+        bpf_printk("Looked up label %d for remote ip %d\n", 
+            *ctx_label_id, ip_to_lookup.ipv4);
     }
 
     if (dir == EGRESS) {
-        bpf_printk("Connect4 called srcip: %u, dstip: %u, dstport: %u", 
+        bpf_printk("Connect_4 called srcip: %u, dstip: %u, dstport: %u", 
             bpf_ntohl(ctx->msg_src_ip4), bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
     } else if (dir == INGRESS) {
-        bpf_printk("Recv_accept4 called srcip: %u, dstip: %u, dstport: %u", 
+        bpf_printk("Receive_4 called srcip: %u, dstip: %u, dstport: %u", 
             bpf_ntohl(ctx->msg_src_ip4),  bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
     }
-    
-    bpf_printk("Looked up label %d for remote ip %d\n", 
-        *ctx_label_id, ip_to_lookup.ipv4);
     
     policy_map_key_t key = {0};
     key.remote_pod_label_id = *ctx_label_id;
@@ -185,8 +180,7 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
 
 SEC("cgroup/connect4_0")
 int authorize_connect4_0(bpf_sock_addr_t *ctx)
-{   bpf_printk("connect4");
-
+{   
     int _ = authorize_v4(ctx, EGRESS);
     if (_ == BPF_SOCK_ADDR_VERDICT_PROCEED) {
         return _;
@@ -206,8 +200,6 @@ int policy_eval_prog(bpf_sock_addr_t *ctx)
 SEC("cgroup/recv_accept4")
 int authorize_recv_accept4(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("recv4");
-
     int _ = authorize_v4(ctx, INGRESS);
     if (_ == BPF_SOCK_ADDR_VERDICT_PROCEED) {
         return _;
@@ -223,7 +215,6 @@ int authorize_recv_accept4(bpf_sock_addr_t *ctx)
 SEC("cgroup/connect6")
 int authorize_connect6(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("connect6");
     int _ = authorize_v4(ctx, EGRESS);
     bpf_tail_call(ctx, &prog_array_map, 1);
 
@@ -234,7 +225,6 @@ int authorize_connect6(bpf_sock_addr_t *ctx)
 SEC("cgroup/recv_accept6")
 int authorize_recv_accept6(bpf_sock_addr_t *ctx)
 {
-    bpf_printk("recv6");
     int _ = authorize_v4(ctx, INGRESS);
     bpf_tail_call(ctx, &prog_array_map, 1);
 
