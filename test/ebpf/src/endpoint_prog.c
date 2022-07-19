@@ -131,7 +131,21 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
             return BPF_SOCK_ADDR_VERDICT_PROCEED;
         }
     //}
-     
+
+
+    uint32_t comp_id = ctx->compartment_id;
+    void *policy_map_id = (uint32_t *)bpf_map_lookup_elem(&map_policy_maps, &comp_id);
+    if (policy_map_id == NULL)
+    {
+        // If there is no policy map attached to this compartment, 
+        // then no policy is applied, allow all traffic.
+        bpf_printk("Policy Eval: No policy map for compartment id %d - allowing traffic.", 
+            ctx->compartment_id);
+        return BPF_SOCK_ADDR_VERDICT_PROCEED;
+    };
+
+
+
     uint32_t *ctx_label_id = NULL;
     ctx_label_id = (uint32_t *)bpf_map_lookup_elem(&ip_cache_map, &ip_to_lookup);
     if (ctx_label_id == NULL)
@@ -191,11 +205,17 @@ int policy_eval_prog(bpf_sock_addr_t *ctx)
 
 SEC("cgroup/recv_accept4")
 int authorize_recv_accept4(bpf_sock_addr_t *ctx)
-{bpf_printk("recv4");
+{
+    bpf_printk("recv4");
+
     int _ = authorize_v4(ctx, INGRESS);
+    if (_ == BPF_SOCK_ADDR_VERDICT_PROCEED) {
+        return _;
+    }
+
     bpf_tail_call(ctx, &prog_array_map, 1);
 
-    return _; 
+    return BPF_SOCK_ADDR_VERDICT_REJECT; 
 }
 
 // ### IPv6 ### //

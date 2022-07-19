@@ -120,13 +120,16 @@ func AttachProgsToCompartment(id int) error {
 		fmt.Println("Failed while attaching prog to compartment %v with err %v", id, reErr)
 		return fmt.Errorf("Failed while attaching prog to compartment %v with err %v", id, reErr)
 	}
+	return nil;
+}
 
+func CreateUpdateCompPolicyMap(id int) error {
 	retCode := C.update_global_policy_map(C.int(id))
 	if retCode < 0 {
 		fmt.Println("Error: Could not get comp map fd")
 		return fmt.Errorf("Error: Could not get comp map fd")
 	}
-	return nil
+	return nil;
 }
 
 func initialize() (*WinEbpfState, int) {

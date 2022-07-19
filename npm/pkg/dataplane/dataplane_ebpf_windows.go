@@ -366,17 +366,17 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 	backendpod, _ := e.GetCompartmentInfoFromPodname("backend")
 	databasepod, _ := e.GetCompartmentInfoFromPodname("database")
 
-	//fmt.Printf("UpdatePolicy: frontend: %+v, backend: %+v\n", frontendpod, backendpod)
-
 	allowAll := 200
 
 	if strings.Contains(policies.PolicyKey, "frontendpolicy") {
 		if frontendpod != nil {
 			for _, frontend := range frontendpod { 
 				if (frontend != nil) {
+					// TODO not built or deployed yet
+					ebpf.CreateUpdateCompPolicyMap(frontend.CompartmentID)
 
 					ebpf.Gupdate_comp_policy_map(allowAll, 80, policyID["frontendpolicy"], frontend.CompartmentID, ebpf.EGRESS, false) // frontend can ping anywhere
-					//ebpf.Gupdate_comp_policy_map(allowAll, 80, policyID["frontendpolicy"], frontendpod.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
+					ebpf.Gupdate_comp_policy_map(allowAll, 80, policyID["frontendpolicy"], frontend.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
 					ebpf.Gupdate_comp_policy_map(allowAll, 53, policyID["frontendpolicy"], frontend.CompartmentID, ebpf.EGRESS, false)  // allow egress from frontend to anywhere on port 53
 				}
 			}
@@ -386,6 +386,8 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 			for _, backend := range backendpod {
 				for _, frontend := range frontendpod {
 					if (frontend != nil && backend != nil) {
+						ebpf.CreateUpdateCompPolicyMap(backend.CompartmentID)
+
 						fmt.Printf("UpdatePolicy: frontend: %+v, backend: %+v\n", frontend, backend)
 						ebpf.Gupdate_comp_policy_map(backend.EbpfRemoteLabelID, 80, policyID["frontendpolicy"], frontend.CompartmentID, ebpf.EGRESS, false)      // allow egress from frontend to backend on port 443 (map above)
 						ebpf.Gupdate_comp_policy_map(frontend.EbpfRemoteLabelID, 80, policyID["frontendpolicy"], backend.CompartmentID, ebpf.INGRESS, false) // allow ingress from frontend to backend on port 443
@@ -404,6 +406,9 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 			for _, backend := range backendpod {
 				for _, database := range databasepod {
 					if backend != nil && database != nil {
+						ebpf.CreateUpdateCompPolicyMap(backend.CompartmentID)
+						ebpf.CreateUpdateCompPolicyMap(database.CompartmentID)
+
 						fmt.Printf("UpdatePolicy: backend: %+v, database: %+v\n", backend, database)
 						ebpf.Gupdate_comp_policy_map(backend.EbpfRemoteLabelID, 80, policyID["databasepolicy"], database.CompartmentID, ebpf.INGRESS, false) // allow ingress to frontend from anywhere on port 443
 						ebpf.Gupdate_comp_policy_map(database.EbpfRemoteLabelID, 80, policyID["databasepolicy"], backend.CompartmentID, ebpf.EGRESS, false)  // allow ingress to frontend from anywhere on port 443
