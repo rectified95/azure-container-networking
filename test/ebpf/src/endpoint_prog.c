@@ -79,7 +79,9 @@ _policy_eval(bpf_sock_addr_t *ctx)
     key_catchall.remote_pod_label_id = 200;
     uint32_t *verdict = bpf_map_lookup_elem(policy_map_id, &key_catchall);
     if (verdict != NULL) {
-        bpf_printk("Policy Eval - found AllowAll. Compartment ID - %d", comp_id);
+        bpf_printk("Policy Eval - found AllowAll. srcIP - %d, dstIP - %d, port - %d", 
+            bpf_ntohl(ctx->msg_src_ip4), bpf_ntohl(ctx->user_ip4), bpf_ntohs(key.remote_port));
+
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
     }
 
@@ -95,7 +97,7 @@ _policy_eval(bpf_sock_addr_t *ctx)
                 bpf_ntohl(ctx->msg_src_ip4),  bpf_ntohl(ctx->user_ip4), bpf_ntohs(ctx->user_port));
         }
 
-        bpf_printk("Policy Eval: L4 policy ID %lu Allowed, remote_pod_label %d, compartment %d.\n", 
+        bpf_printk("Policy Eval: L4 policy ID %lu Allowed, remote_pod_label %d, compartment %d.", 
             *verdict, key.remote_pod_label_id, comp_id);
 
         return BPF_SOCK_ADDR_VERDICT_PROCEED;
@@ -112,7 +114,7 @@ _policy_eval(bpf_sock_addr_t *ctx)
     }
 
     if (key.remote_pod_label_id != 200) {
-        bpf_printk("Dropping packet: no L4 or L3 rules found for labelid: %d, direction: %d, port: %d\n", 
+        bpf_printk("Dropping packet: no L4 or L3 rules found for labelid: %d, direction: %d, port: %d", 
                 key.remote_pod_label_id, key.direction, bpf_ntohs(ctx->user_port));
     }
 
@@ -158,7 +160,7 @@ authorize_v4(bpf_sock_addr_t *ctx, direction_t dir)
         //bpf_printk("No known label found, assigning INTERNET label for IP %d", bpf_ntohl(ip_to_lookup.ipv4));
         ctx_label_id = &allowAll;
     } else {
-        bpf_printk("\nLooked up label %d for remote ip %d\n", 
+        bpf_printk("Looked up label %d for remote ip %d", 
             *ctx_label_id, bpf_ntohl(ip_to_lookup.ipv4));
     }
     
