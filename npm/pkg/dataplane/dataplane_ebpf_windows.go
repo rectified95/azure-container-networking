@@ -373,8 +373,6 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 					for _, database := range databasepod {
 						if (frontend != nil && backend != nil) {
 							ebpf.CreateUpdateCompPolicyMap(frontend.CompartmentID)
-							ebpf.CreateUpdateCompPolicyMap(backend.CompartmentID)
-							ebpf.CreateUpdateCompPolicyMap(database.CompartmentID)
 
 							if (frontend.CompartmentID != 0) {
 								// Frontend can ping backend and db on port 80.
@@ -385,14 +383,9 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 								ebpf.Gupdate_comp_policy_map(allowAll, 80, policyID["frontendpolicy"], frontend.CompartmentID, ebpf.INGRESS, false)
 								// Allow egress from frontend to anywhere on port 53.
 								ebpf.Gupdate_comp_policy_map(allowAll, 53, policyID["frontendpolicy"], frontend.CompartmentID, ebpf.EGRESS, false) 
+
+								fmt.Printf("UpdatePolicy: frontend: %+v, backend: %+v, database: %+v,\n", frontend, backend, database)
 							}
-							
-							if (backend.CompartmentID != 0) {
-								// Allow ingress to backend from frontend.
-								ebpf.Gupdate_comp_policy_map(frontend.EbpfRemoteLabelID, 80, policyID["frontendpolicy"], backend.CompartmentID, ebpf.INGRESS, false)
-							}
-							
-							fmt.Printf("UpdatePolicy: frontend: %+v, backend: %+v\n", frontend, backend)
 						}
 					}
 				}
@@ -401,7 +394,21 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 	}
 
 	if strings.Contains(policies.PolicyKey, "backendpolicy") {
-
+		if backendpod != nil && frontendpod != nil {
+			for _, backend := range backendpod {
+				for _, frontend := range frontendpod {
+					if (frontend != nil && backend != nil) {
+						ebpf.CreateUpdateCompPolicyMap(backend.CompartmentID)
+						
+						if (backend.CompartmentID != 0) {
+							// Allow ingress to backend from frontend.
+							ebpf.Gupdate_comp_policy_map(frontend.EbpfRemoteLabelID, 80, policyID["backendpolicy"], backend.CompartmentID, ebpf.INGRESS, false)
+							fmt.Printf("UpdatePolicy: frontend: %+v, backend: %+v\n", frontend, backend)
+						}
+					}
+				}
+			}
+		}
 	}
 
 	if strings.Contains(policies.PolicyKey, "databasepolicy") {
@@ -419,7 +426,6 @@ func (e *EbpfDataplane) UpdatePolicy(policies *policies.NPMNetworkPolicy) error 
 				}
 			}
 		}
-
 	}
 
 	return nil
